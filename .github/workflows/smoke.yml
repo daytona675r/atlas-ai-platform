@@ -1,0 +1,67 @@
+name: Smoke CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: VAL-L2-01 Lint
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+
+      - name: VAL-L2-02 Typecheck
+        run: mypy src/mlops
+
+      - name: VAL-L1 Data validation
+        run: python -m mlops.cli validate-data --mode smoke
+
+      - name: VAL-L2-03 Unit tests
+        run: MLFLOW_DISABLED=1 pytest tests/unit tests/contract --cov=mlops --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+
+      - name: VAL-L2-04 Build train image
+        run: docker build -f docker/Dockerfile.train -t mlops-train .
+
+      - name: VAL-L2-05 Import smoke
+        run: docker run --rm mlops-train python -c "import mlops"
+
+      - name: VAL-L2-06 MLflow ping
+        run: python -m mlops.cli mlflow-ping
+        continue-on-error: ${{ secrets.MLFLOW_TRACKING_URI == '' }}
+
+      - name: VAL-L2-07 Mini train
+        run: |
+          if [ -z "$MLFLOW_TRACKING_URI" ]; then export MLFLOW_DISABLED=1; fi
+          RUN_ID=$(python -m mlops.cli train --config configs/smoke.yaml | tail -1)
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+
+      - name: VAL-L2-08 Artifact exists
+        run: test -f model.pkl
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+        if: always()

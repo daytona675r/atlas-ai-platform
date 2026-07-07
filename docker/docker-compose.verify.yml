@@ -1,0 +1,14 @@
+services:
+  serve:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.serve
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL_PATH: /app/model.pkl
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

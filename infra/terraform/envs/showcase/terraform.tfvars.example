@@ -1,0 +1,3 @@
+project_name             = "mlops-showcase"
+enable_storage           = false
+github_actions_role_name = "mlops-github-actions"

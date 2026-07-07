@@ -1,0 +1,34 @@
+dataset_name: uci_adult
+url: https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data
+sha256: 5b00264637dbfec36bdeaab5676b0b309ff9eb788d63554ca0a249491c86603d
+cache_path: .data/adult.data
+columns:
+  - age
+  - workclass
+  - fnlwgt
+  - education
+  - education-num
+  - marital-status
+  - occupation
+  - relationship
+  - race
+  - sex
+  - capital-gain
+  - capital-loss
+  - hours-per-week
+  - native-country
+  - income
+target: income
+positive_label: ">50K"
+row_count:
+  smoke_min: 500
+  smoke_max: 2000
+  full_min: 30000
+  full_max: 50000
+minority_class_min:
+  smoke: 0.20
+  full: 0.15
+missing_rate_max:
+  smoke_any_feature: 0.10
+  full_default: 0.05
+  full_native_country: 0.15

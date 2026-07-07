@@ -1,0 +1,10 @@
+mode: full
+random_state: 42
+train_ratio: 0.8
+val_ratio: 0.1
+test_ratio: 0.1
+model:
+  type: hist_gradient_boosting
+  max_iter: 100
+mlflow:
+  experiment_name: full

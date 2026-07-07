@@ -1,0 +1,11 @@
+mode: smoke
+max_rows: 1000
+random_state: 42
+train_ratio: 0.8
+val_ratio: 0.1
+test_ratio: 0.1
+model:
+  type: logistic_regression
+  max_iter: 200
+mlflow:
+  experiment_name: smoke

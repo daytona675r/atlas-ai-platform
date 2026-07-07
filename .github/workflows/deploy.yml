@@ -1,0 +1,110 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [Full Train]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      production:
+        description: Promote to production after verify
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+jobs:
+  deploy-verify:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Download model
+        uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: .
+        continue-on-error: true
+
+      - name: Train smoke model if missing
+        if: hashFiles('model.pkl') == ''
+        run: |
+          MLFLOW_DISABLED=1 python -m mlops.cli train --config configs/smoke.yaml
+
+      - name: VAL-L4-01 Build serve image
+        run: docker build -f docker/Dockerfile.serve -t mlops-serve .
+
+      - name: VAL-L4-02 Start verify stack
+        run: docker compose -f docker/docker-compose.verify.yml up -d --build
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: VAL-L4-03–09 Contract verify
+        run: python scripts/verify_deploy.py
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker/docker-compose.verify.yml down
+
+  deploy-staging:
+    needs: deploy-verify
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Hugging Face Space
+        env:
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        run: |
+          echo "Deploy mlops-serve image to HF Space: ${HF_SPACE_ID}"
+          echo "Configure HF_TOKEN and HF_SPACE_ID; push Docker Space via huggingface_hub CLI in your fork."
+          # Example: huggingface-cli upload ...
+
+  deploy-production:
+    if: ${{ github.event.inputs.production == 'true' }}
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: VAL-L4-13 Production preflight
+        run: |
+          MLFLOW_DISABLED=1 python -m mlops.cli train --config configs/smoke.yaml
+          docker compose -f docker/docker-compose.verify.yml up -d --build
+          sleep 10
+          python scripts/verify_deploy.py
+          docker compose -f docker/docker-compose.verify.yml down
+
+      - name: Promote production alias
+        run: |
+          echo "Set @production alias in MLflow registry via DagsHub UI or mlflow client."
