@@ -70,7 +70,8 @@ def health() -> dict[str, str]:
 def predict(body: PredictRequest) -> PredictResponse:
     model = load_model()
     raw = body.model_dump(by_alias=True)
-    frame = pd.DataFrame([[raw[col] for col in feature_columns()]], columns=feature_columns)
+    columns = feature_columns()
+    frame = pd.DataFrame([[raw[col] for col in columns]], columns=columns)
     try:
         pred = model.predict(frame)[0]
         proba = float(model.predict_proba(frame)[0][1])
