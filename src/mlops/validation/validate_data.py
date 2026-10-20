@@ -111,7 +111,7 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
         if col not in numeric_columns:
             _check(df[col].nunique(dropna=True) <= 100, "VAL-L1-16", f"{col} cardinality")
 
-    feature_hash = df[features].astype(str).agg("|".join, axis=1)
+    feature_hash = df[features].apply(lambda row: "|".join(row.astype(str)), axis=1)
     _check(not feature_hash.duplicated().any(), "VAL-L1-17", "duplicate feature rows")
 
     train_df, val_df, test_df = split_dataframe(
@@ -122,8 +122,8 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
         test_ratio=0.1,
         random_state=42,
     )
-    train_keys = set(train_df[features].astype(str).agg("|".join, axis=1))
-    test_keys = set(test_df[features].astype(str).agg("|".join, axis=1))
+    train_keys = set(train_df[features].apply(lambda row: "|".join(row.astype(str)), axis=1))
+    test_keys = set(test_df[features].apply(lambda row: "|".join(row.astype(str)), axis=1))
     _check(train_keys.isdisjoint(test_keys), "VAL-L1-18", "train/test overlap")
 
     return df
