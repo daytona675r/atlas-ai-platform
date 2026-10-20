@@ -56,7 +56,7 @@ def load_model() -> Any:
     return _model
 
 
-@app.on_event("startup")  # noqa: DEPRECATED — simple lifespan for showcase
+@app.on_event("startup")  # noqa: E402
 def startup() -> None:
     load_model()
 

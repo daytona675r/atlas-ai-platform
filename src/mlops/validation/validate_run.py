@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-import joblib
 import mlflow
-import numpy as np
 import pandas as pd
 from mlflow.tracking import MlflowClient
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
@@ -58,7 +55,9 @@ def validate_layer3(run_id: str) -> None:
         _check((pred == 1).any() and (pred == 0).any(), "VAL-L3-07", "single class predictions")
         pos_rate = float(proba.mean())
         _check(
-            thresholds["test_positive_rate_min"] <= pos_rate <= thresholds["test_positive_rate_max"],
+            thresholds["test_positive_rate_min"]
+            <= pos_rate
+            <= thresholds["test_positive_rate_max"],
             "VAL-L3-08",
             f"pos rate {pos_rate}",
         )

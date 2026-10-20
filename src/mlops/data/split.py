@@ -27,4 +27,8 @@ def split_dataframe(
         random_state=random_state,
         stratify=temp_df[target],
     )
-    return train_df.reset_index(drop=True), val_df.reset_index(drop=True), test_df.reset_index(drop=True)
+    return (
+        train_df.reset_index(drop=True),
+        val_df.reset_index(drop=True),
+        test_df.reset_index(drop=True),
+    )

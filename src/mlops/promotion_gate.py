@@ -4,7 +4,6 @@ import argparse
 import sys
 from typing import Any
 
-import mlflow
 from mlflow.tracking import MlflowClient
 
 from mlops.config import REPO_ROOT, load_yaml

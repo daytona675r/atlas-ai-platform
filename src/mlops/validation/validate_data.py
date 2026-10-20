@@ -48,13 +48,21 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
         minority_min = cfg["minority_class_min"]["full"]
         miss_cap = None
 
-    _check(row_min <= len(df) <= row_max, "VAL-L1-06", f"row count {len(df)} not in [{row_min},{row_max}]")
+    _check(
+        row_min <= len(df) <= row_max,
+        "VAL-L1-06",
+        f"row count {len(df)} not in [{row_min},{row_max}]",
+    )
 
     target = cfg["target"]
     labels = df[target].astype(str).str.strip()
     allowed = {"<=50K", ">50K"}
     _check(set(labels.unique()).issubset(allowed), "VAL-L1-07", f"invalid labels {set(labels.unique())}")
-    _check(labels.notna().all() and (labels != "").all(), "VAL-L1-08", "empty targets")
+    _check(
+        labels.notna().all() and (labels != "").all(),
+        "VAL-L1-08",
+        "empty targets",
+    )
 
     pos_rate = (labels == cfg["positive_label"]).mean()
     min_rate = min(pos_rate, 1 - pos_rate)
@@ -72,8 +80,16 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
             cap = cfg["missing_rate_max"]["full_native_country"]
         elif mode == "full":
             cap = cfg["missing_rate_max"]["full_default"]
-        _check(rate <= cap, "VAL-L1-13", f"{col} missing rate {rate} > {cap}")
-        _check(not df[col].isna().all(), "VAL-L1-14", f"{col} all null")
+        _check(
+            rate <= cap,
+            "VAL-L1-13",
+            f"{col} missing rate {rate} > {cap}",
+        )
+        _check(
+            not df[col].isna().all(),
+            "VAL-L1-14",
+            f"{col} all null",
+        )
 
     for col in features:
         if col in {"age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"}:

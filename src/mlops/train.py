@@ -3,11 +3,9 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Any
 
 import joblib
 import mlflow
-import pandas as pd
 from mlflow.models import infer_signature
 
 from mlops.config import REPO_ROOT, file_sha256, load_yaml

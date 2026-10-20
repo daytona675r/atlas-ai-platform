@@ -4,7 +4,9 @@ import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
 
-def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray, y_proba: np.ndarray | None) -> dict[str, float]:
+def compute_metrics(
+    y_true: np.ndarray, y_pred: np.ndarray, y_proba: np.ndarray | None
+) -> dict[str, float]:
     metrics: dict[str, float] = {
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "f1": float(f1_score(y_true, y_pred, pos_label=1)),
