@@ -57,7 +57,11 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
     target = cfg["target"]
     labels = df[target].astype(str).str.strip()
     allowed = {"<=50K", ">50K"}
-    _check(set(labels.unique()).issubset(allowed), "VAL-L1-07", f"invalid labels {set(labels.unique())}")
+    _check(
+        set(labels.unique()).issubset(allowed),
+        "VAL-L1-07",
+        f"invalid labels {set(labels.unique())}",
+    )
     _check(
         labels.notna().all() and (labels != "").all(),
         "VAL-L1-08",
@@ -92,11 +96,19 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
         )
 
     for col in features:
-        if col in {"age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"}:
+        numeric_columns = {
+            "age",
+            "fnlwgt",
+            "education-num",
+            "capital-gain",
+            "capital-loss",
+            "hours-per-week",
+        }
+        if col in numeric_columns:
             _check(df[col].nunique(dropna=True) > 1, "VAL-L1-15", f"{col} constant")
         else:
             _check(df[col].nunique(dropna=True) > 1, "VAL-L1-15", f"{col} constant cat")
-        if col not in {"age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"}:
+        if col not in numeric_columns:
             _check(df[col].nunique(dropna=True) <= 100, "VAL-L1-16", f"{col} cardinality")
 
     feature_hash = df[features].astype(str).agg("|".join, axis=1)
