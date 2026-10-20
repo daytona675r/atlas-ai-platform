@@ -47,6 +47,7 @@ src = ["src"]
 select = ["E", "F", "I", "UP"]
 
 [tool.mypy]
+ignore_missing_imports = true
 python_version = "3.11"
 packages = ["mlops"]
 mypy_path = "src"
