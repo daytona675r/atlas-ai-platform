@@ -34,15 +34,6 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
-      - name: Configure AWS (OIDC)
-        if: secrets.AWS_ROLE_ARN != ''
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-central-1
-
-      - name: Terraform plan
-        run: terraform plan -input=false
-        continue-on-error: true
-        env:
-          TF_VAR_project_name: mlops-showcase
+      # Authenticated cloud planning is intentionally separate from this
+      # credential-free formatting/validation gate. Run it from a protected
+      # environment once AWS/OIDC variables are configured.

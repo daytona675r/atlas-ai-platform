@@ -65,3 +65,14 @@ jobs:
           name: coverage
           path: coverage.xml
         if: always()
+
+      - name: Publish validation summary
+        if: always()
+        run: |
+          {
+            echo '## Atlas smoke validation'
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo "External MLflow: $([ -n \"$MLFLOW_TRACKING_URI\" ] && echo enabled || echo disabled)"
+            echo "Model artifact: $(sha256sum model.pkl 2>/dev/null || echo unavailable)"
+          } >> "$GITHUB_STEP_SUMMARY"
