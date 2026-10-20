@@ -44,7 +44,7 @@ jobs:
         run: docker build -f docker/Dockerfile.train -t mlops-train .
 
       - name: VAL-L2-05 Import smoke
-        run: docker run --rm mlops-train python -c "import mlops"
+        run: docker run --rm --entrypoint python mlops-train -c "import mlops"
 
       - name: VAL-L2-06 MLflow ping
         if: ${{ env.MLFLOW_TRACKING_URI != '' }}
