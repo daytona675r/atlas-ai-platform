@@ -5,7 +5,7 @@
 [![Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/workflows/smoke.yml/badge.svg)](../../actions/workflows/smoke.yml)
 [![Train Pipeline](https://github.com/daytona675r/atlas-ai-platform/actions/workflows/train.yml/badge.svg)](../../actions/workflows/train.yml)
 [![Deploy](https://github.com/daytona675r/atlas-ai-platform/actions/workflows/deploy.yml/badge.svg)](../../actions/workflows/deploy.yml)
-![Python](https://img.shields.io/badge/Python-3.12-blue)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![MLflow](https://img.shields.io/badge/MLflow-DagsHub-blue)
 ![Terraform](https://img.shields.io/badge/IaC-Terraform-623CE4)
 ![License](https://img.shields.io/badge/License-MIT-green)

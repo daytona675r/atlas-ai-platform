@@ -47,8 +47,8 @@ jobs:
         run: docker run --rm mlops-train python -c "import mlops"
 
       - name: VAL-L2-06 MLflow ping
+        if: ${{ env.MLFLOW_TRACKING_URI != '' }}
         run: python -m mlops.cli mlflow-ping
-        continue-on-error: ${{ secrets.MLFLOW_TRACKING_URI == '' }}
 
       - name: VAL-L2-07 Mini train
         run: |

@@ -20,7 +20,7 @@ validate-data-full:
 	python -m mlops.cli validate-data --mode full
 
 train-smoke:
-	MLOFLOW_DISABLED=1 python -m mlops.cli train --config configs/smoke.yaml
+	MLFLOW_DISABLED=1 python -m mlops.cli train --config configs/smoke.yaml
 
 train-full:
 	python -m mlops.cli train --config configs/full.yaml
