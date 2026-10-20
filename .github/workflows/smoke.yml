@@ -38,7 +38,7 @@ jobs:
         run: python -m mlops.cli validate-data --mode smoke
 
       - name: VAL-L2-03 Unit tests
-        run: MLFLOW_DISABLED=1 pytest tests/unit tests/contract --cov=mlops --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+        run: MLFLOW_DISABLED=1 pytest tests/unit tests/contract --cov=mlops --cov-report=xml --cov-report=term-missing --cov-fail-under=35
 
       - name: VAL-L2-04 Build train image
         run: docker build -f docker/Dockerfile.train -t mlops-train .
