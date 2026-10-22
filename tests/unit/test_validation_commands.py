@@ -69,3 +69,30 @@ def test_cli_dispatches_validate_data(monkeypatch) -> None:
     monkeypatch.setattr(cli, "validate_data_main", lambda: called.append(cli.sys.argv) or 0)
     assert cli.cmd_validate_data(Namespace(config="manifest.yaml", mode="smoke")) == 0
     assert called and "--mode" in called[0]
+
+
+def test_cli_dispatches_train_and_validate_run(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "run_training", lambda config: "run-123")
+    assert cli.cmd_train(Namespace(config="smoke.yaml")) == 0
+    monkeypatch.setattr(cli, "validate_run_main", lambda: 0)
+    assert cli.cmd_validate_run(Namespace(run_id="run-123")) == 0
+
+
+def test_cli_main_supports_disabled_mlflow(monkeypatch) -> None:
+    monkeypatch.setenv("MLFLOW_DISABLED", "1")
+    assert cli.main(["mlflow-ping"]) == 0
+
+
+def test_promotion_gate_rejects_regression(monkeypatch) -> None:
+    challenger = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.4}))
+    champion_run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    version = SimpleNamespace(run_id="champion")
+    client = SimpleNamespace(
+        get_run=lambda run_id: challenger if run_id == "run" else champion_run,
+        get_latest_versions=lambda *_args, **_kwargs: [version],
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    ok, message = check_champion(
+        "run", {"registry_model_name": "model", "champion_improvement_min": 0.0}
+    )
+    assert not ok and "< champion" in message
