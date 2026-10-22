@@ -204,3 +204,15 @@ It demonstrates how experienced software engineering practices can be applied to
 The emphasis is not on achieving the highest model accuracy.
 
 The emphasis is on building AI systems that can be trusted in production.
+
+## Continuous deployment
+
+`.github/workflows/deploy.yml` provides the Docker-based Hugging Face Space
+staging path. A successful full-train run hands off its exact `model.pkl` and
+immutable candidate metadata to the deployment workflow; the workflow verifies
+the local serving contract, pushes the same artifact to the configured Space,
+waits for hosted health and runs the Layer-4 inference/golden checks. Configure
+the repository variable `HF_SPACE_REPO` and secret `HF_TOKEN` before enabling
+the hosted stage. Without them, the workflow records an explicit skipped state
+instead of pretending that deployment occurred. Production alias promotion
+remains a protected, manual boundary after hosted verification.

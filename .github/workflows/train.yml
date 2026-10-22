@@ -45,8 +45,27 @@ jobs:
       - name: Register staging
         run: python -m mlops.cli register --run-id ${{ steps.train.outputs.run_id }}
 
+      - name: Write candidate metadata
+        if: ${{ always() && steps.train.outcome == 'success' }}
+        env:
+          CANDIDATE_RUN_ID: ${{ steps.train.outputs.run_id }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          metadata = {
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "source_workflow": os.environ["GITHUB_WORKFLOW"],
+              "source_run_id": os.environ["GITHUB_RUN_ID"],
+              "run_id": os.environ["CANDIDATE_RUN_ID"],
+              "model_sha256": hashlib.sha256(Path("model.pkl").read_bytes()).hexdigest(),
+          }
+          Path("candidate-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+
       - name: Upload model artifact
         uses: actions/upload-artifact@v4
         with:
           name: model
-          path: model.pkl
+          path: |
+            model.pkl
+            candidate-metadata.json
