@@ -26,6 +26,7 @@ jobs:
     outputs:
       ready: ${{ steps.check.outputs.ready }}
       source_run_id: ${{ steps.check.outputs.source_run_id }}
+      source_sha: ${{ steps.check.outputs.source_sha }}
     steps:
       - id: check
         env:
@@ -33,9 +34,24 @@ jobs:
           HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id || github.event.workflow_run.id }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "source_run_id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
-          if [[ -n "$HF_SPACE_REPO" && -n "$HF_SPACE_URL" && -n "$HF_TOKEN" && -n "$SOURCE_RUN_ID" ]]; then
+          if [[ -z "$SOURCE_RUN_ID" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Missing exact Full Train source run ID." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" > source-run.json
+          python - <<'PY'
+          import json
+          data = json.load(open("source-run.json"))
+          if data.get("name") != "Full Train" or data.get("status") != "completed" or data.get("conclusion") != "success":
+              raise SystemExit("source run must be a completed successful Full Train run")
+          print(data["head_sha"])
+          PY
+          echo "source_sha=$(python -c 'import json; print(json.load(open("source-run.json"))["head_sha"])')" >> "$GITHUB_OUTPUT"
+          if [[ -n "$HF_SPACE_REPO" && -n "$HF_SPACE_URL" && -n "$HF_TOKEN" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "HF Space deployment is configured."
           else
@@ -53,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ needs.configuration.outputs.source_sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -69,21 +85,21 @@ jobs:
 
       - name: Validate candidate handoff
         id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           test -s candidate/model.pkl
           test -s candidate/candidate-metadata.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${{ needs.configuration.outputs.source_run_id }}" > source-run.json
           cp candidate/model.pkl model.pkl
           cp candidate/candidate-metadata.json candidate-metadata.json
-          python - <<'PY'
-          import hashlib, json
-          from pathlib import Path
-          data = json.loads(Path("candidate-metadata.json").read_text())
-          assert data["run_id"] and data["model_sha256"]
-          actual = hashlib.sha256(Path("candidate/model.pkl").read_bytes()).hexdigest()
-          assert actual == data["model_sha256"], (actual, data["model_sha256"])
-          print(data["run_id"])
-          PY
-          echo "run_id=$(python -c 'import json; print(json.load(open("candidate-metadata.json"))["run_id"])')" >> "$GITHUB_OUTPUT"
+          python scripts/validate_candidate.py \
+            --run-json source-run.json \
+            --metadata candidate-metadata.json \
+            --model candidate/model.pkl \
+            --requested-run-id "${{ needs.configuration.outputs.source_run_id }}" > candidate-result.json
+          test "$(git rev-parse HEAD)" = "$(python -c 'import json; print(json.load(open("candidate-result.json"))["commit_sha"])')"
+          echo "run_id=$(python -c 'import json; print(json.load(open("candidate-result.json"))["run_id"])')" >> "$GITHUB_OUTPUT"
 
       - name: Build and verify serving artifact locally
         run: |
@@ -127,8 +143,8 @@ jobs:
         run: |
           {
             echo '## Atlas staging deployment'
-            echo "Commit: $GITHUB_SHA"
-            echo "Source workflow run: ${{ github.event.workflow_run.id || github.run_id }}"
+            echo "Candidate commit: $(python -c 'import json; print(json.load(open("candidate-result.json"))["commit_sha"])' 2>/dev/null || echo unavailable)"
+            echo "Source Full Train run: ${{ needs.configuration.outputs.source_run_id }}"
             echo "Candidate metadata: $(cat candidate-metadata.json 2>/dev/null || echo unavailable)"
             echo "Target Space: ${HF_SPACE_URL}"
             echo 'Hosted verification runs before any promotion step.'
