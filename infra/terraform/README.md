@@ -28,7 +28,13 @@ Set `enable_storage = true` in `envs/showcase/terraform.tfvars` after OIDC role 
 
 ## CI
 
-`terraform-plan.yml` runs `terraform plan` on PRs when `infra/**` changes.
+`terraform-plan.yml` currently performs formatting, backend-free initialization
+and validation on PRs when `infra/**` changes. It does not authenticate to HCP
+Terraform or run a remote plan/apply.
+
+Authenticated `plan`/`apply` is an operator action after configuring the HCP
+backend and credentials; use the local commands below or a separately approved
+workflow with the required OIDC permissions.
 
 Use OIDC in workflow:
 

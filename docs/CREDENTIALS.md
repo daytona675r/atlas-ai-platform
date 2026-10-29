@@ -14,8 +14,14 @@
 
 | Variable | Example |
 |----------|---------|
-| `HF_SPACE_ID` | `your-user/adult-income-api` |
+| `HF_SPACE_REPO` | `your-user/adult-income-api` |
+| `HF_SPACE_URL` | `https://your-user-adult-income-api.hf.space` |
 | `MLFLOW_REGISTRY_MODEL` | `adult-income` |
+
+`HF_SPACE_REPO`, `HF_SPACE_URL` and `HF_TOKEN` are required for the hosted
+deployment stage. Until they are configured and a hosted run is verified, the
+deployment workflow records an explicit skipped state; no public endpoint is
+assumed.
 
 ## Workflow injection
 

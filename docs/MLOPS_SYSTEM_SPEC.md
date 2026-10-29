@@ -32,7 +32,7 @@ validation_layers: 4
 | FR-001 | Reproducible training from pinned config + `random_state` |
 | FR-002 | VAL-L1 + VAL-L2 in `smoke.yml`; failure blocks CI |
 | FR-003 | Full train; VAL-L3 required before MLflow registration |
-| FR-004 | VAL-L4 before `@staging`; repeat before `@production` |
+| FR-004 | VAL-L3 registers `@staging`; hosted VAL-L4 is required before `@production` |
 | FR-005 | Champion comparison (VAL-L3-11) |
 | FR-006 | Terraform state on HCP; AWS via OIDC only |
 | FR-007 | CD to Hugging Face Spaces after VAL-L4 |
@@ -62,16 +62,16 @@ validation_layers: 4
 
 ## architecture {#architecture}
 
-See [README.md](../README.md) for diagram. Flow: PR → `smoke.yml` (L1,L2) → `train.yml` (L1, train, L3, register) → `deploy.yml` (L4, HF).
+See [README.md](../README.md) for the diagram. Flow: PR → `smoke.yml` (L1,L2) → `train.yml` (L1, train, L3, register `@staging`) → `deploy.yml` (exact Smoke prerequisite, local L4, HF hosted L4).
 
 ## pipelines {#pipelines}
 
 | Workflow | Trigger | Steps |
 |----------|---------|-------|
-| `smoke.yml` | PR, push `main` | VAL-L1 → VAL-L2 |
-| `train.yml` | push `main`, tag, manual | VAL-L1 → train → VAL-L3 → register `@staging` |
+| `smoke.yml` | PR, push `main`, `v*` tags, manual | VAL-L1 → VAL-L2 |
+| `train.yml` | `v*` tags, manual | VAL-L1 → train → VAL-L3 → register `@staging` |
 | `deploy.yml` | after train, manual | VAL-L4 → HF deploy → VAL-L4 preflight → `@production` |
-| `terraform-plan.yml` | PR touching `infra/**` | `terraform plan` |
+| `terraform-plan.yml` | PR touching `infra/**` | `fmt`, `init -backend=false`, `validate` |
 
 ## validation {#validation}
 
@@ -81,7 +81,7 @@ Gate rules:
 |---------|--------|
 | L1 or L2 | CI build |
 | L3 | Registration / `@staging` |
-| L4 | Deploy to `@staging` |
+| L4 | Hosted deployment verification (when HF configuration is present) |
 | L4 preflight | `@staging` → `@production` |
 
 ### Layer 1 — Data (`validate_data.py`)
@@ -151,8 +151,8 @@ Gate rules:
 ## decision_gates {#decision_gates}
 
 1. VAL-L3 pass → register model `adult-income` version → alias `@staging`.
-2. VAL-L4 pass → deploy to HF Space.
-3. VAL-L4 preflight with `@production` model URI → promote alias.
+2. Deploy validates the exact Full Train artifact locally, then performs hosted L4 checks when HF configuration is available.
+3. Only a verified candidate may be promoted to the `@production` alias by the protected manual path.
 
 ## iac_map {#iac_map}
 
@@ -169,4 +169,17 @@ See [docs/CREDENTIALS.md](CREDENTIALS.md) and [infra/terraform/README.md](../inf
 ## open_questions {#open_questions}
 
 - ADR-002: DagsHub-only vs AWS S3 for artifacts (default: DagsHub).
-- HF Space name and org (set in GitHub vars).
+- HF Space repository and runtime URL (set in `HF_SPACE_REPO` and `HF_SPACE_URL`).
+
+## implementation_status {#implementation_status}
+
+Implemented and enforced: data validation, lint/type/unit checks, smoke
+training, Docker build/import, full-train run validation, champion comparison,
+artifact hash/provenance checks, exact Smoke-CI prerequisite validation and
+local serving verification. Hosted HF verification and production promotion
+remain configuration-dependent; there is no confirmed hosted run or public
+endpoint in this repository yet.
+
+The validation catalogue above includes intended layer IDs for the complete
+system. The executable checks in each workflow and script are the authority for
+what is currently enforced.

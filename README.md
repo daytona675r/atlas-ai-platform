@@ -1,6 +1,6 @@
 # Atlas AI Platform
 
-> **A reference implementation of a production-oriented AI platform demonstrating reproducible model lifecycle management, multi-stage validation, infrastructure as code, and automated deployment.**
+> **Atlas is an AI infrastructure reference implementation: a senior-engineering approach to reproducible training, verifiable model quality and controlled delivery.**
 
 [![Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/workflows/smoke.yml/badge.svg)](../../actions/workflows/smoke.yml)
 [![Train Pipeline](https://github.com/daytona675r/atlas-ai-platform/actions/workflows/train.yml/badge.svg)](../../actions/workflows/train.yml)
@@ -26,7 +26,14 @@ The goal is to demonstrate how production AI systems can be engineered using rep
 
 The included **UCI Adult Income** dataset is intentionally lightweight so the focus remains on engineering the platform rather than optimizing the model.
 
-This Project is work in progress.
+Atlas is a focused engineering reference implementation. It separates checks
+that run in credential-free CI from optional cloud and hosted stages, so a green
+local pipeline is never presented as proof of a hosted deployment.
+
+Current evidence: [Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/runs/40929514856)
+and [Portfolio Acceptance](https://github.com/daytona675r/atlas-ai-platform/actions/runs/40929514389)
+are green on the current main branch. A confirmed Hugging Face hosted run and
+public endpoint are still pending owner configuration and issue #4.
 
 ---
 
@@ -81,7 +88,7 @@ Production Validation
 
 - Reproducible model training
 - MLflow model lifecycle
-- Automated model promotion
+- Controlled model promotion
 - Versioned experiments
 - Model lineage
 
@@ -105,7 +112,10 @@ Evaluates training quality, reproducibility, overfitting safeguards and champion
 
 Verifies the deployed application through health checks, inference tests, schema validation and production readiness.
 
-Every deployment must successfully pass all four layers before promotion.
+The four layers describe the intended control plane. The repository currently
+enforces data/engineering checks, model validation and local serving checks;
+hosted HF verification and production alias promotion remain gated by the
+configured deployment workflow.
 
 ---
 
@@ -187,11 +197,9 @@ Atlas is built around a few engineering principles.
 
 # Documentation
 
-- System Specification
-- Validation Architecture
-- Infrastructure
-- CI/CD Pipelines
-- Deployment Guide
+- [System specification](docs/MLOPS_SYSTEM_SPEC.md)
+- [Credentials and OIDC runbook](docs/CREDENTIALS.md)
+- [Terraform infrastructure](infra/terraform/README.md)
 
 ---
 
