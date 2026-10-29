@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,7 @@ from mlops.models.pipeline import feature_columns
 app = FastAPI(title="Adult Income API", version="0.1.0")
 
 _model = None
+_model_info: dict[str, str] | None = None
 
 
 class PredictRequest(BaseModel):
@@ -42,17 +45,37 @@ class PredictResponse(BaseModel):
 
 
 def load_model() -> Any:
-    global _model
+    global _model, _model_info
     if _model is not None:
         return _model
     model_uri = os.getenv("MODEL_URI")
     model_path = os.getenv("MODEL_PATH", "model.pkl")
+    metadata_path = Path(os.getenv("MODEL_METADATA_PATH", "candidate-metadata.json"))
+    require_metadata = os.getenv("REQUIRE_MODEL_METADATA", "0").lower() in {"1", "true", "yes"}
+    if require_metadata and not metadata_path.exists():
+        raise RuntimeError(f"Model provenance metadata is required: {metadata_path}")
+    if metadata_path.exists():
+        try:
+            metadata = json.loads(metadata_path.read_text())
+            required = ("commit_sha", "source_run_id", "run_id", "model_sha256")
+            if any(not isinstance(metadata.get(key), str) or not metadata[key] for key in required):
+                raise ValueError("candidate metadata is missing required identity fields")
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            raise RuntimeError(f"Invalid model provenance metadata: {exc}") from exc
+    else:
+        metadata = {"mode": "local"}
     if model_uri:
         _model = mlflow.sklearn.load_model(model_uri)
     elif Path(model_path).exists():
-        _model = joblib.load(model_path)
+        model_file = Path(model_path)
+        _model = joblib.load(model_file)
+        if metadata.get("model_sha256"):
+            actual = hashlib.sha256(model_file.read_bytes()).hexdigest()
+            if metadata["model_sha256"] != actual:
+                raise RuntimeError("Model provenance metadata does not match model bytes")
     else:
         raise RuntimeError("No MODEL_URI or MODEL_PATH configured")
+    _model_info = {str(key): str(value) for key, value in metadata.items()}
     return _model
 
 
@@ -64,6 +87,13 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/model-info")
+def model_info() -> dict[str, str]:
+    load_model()
+    assert _model_info is not None
+    return _model_info
 
 
 @app.post("/predict", response_model=PredictResponse)

@@ -26,6 +26,17 @@ def main() -> int:
         r = client.get("/health")
         check(r.status_code == 200 and r.json().get("status") == "ok", "VAL-L4-03", r.text)
 
+        r = client.get("/model-info")
+        check(r.status_code == 200, "VAL-L4-04", r.text)
+        info = r.json()
+        for env_name, field in (("EXPECTED_COMMIT_SHA", "commit_sha"),
+                                ("EXPECTED_SOURCE_RUN_ID", "source_run_id"),
+                                ("EXPECTED_MLFLOW_RUN_ID", "run_id"),
+                                ("EXPECTED_MODEL_SHA256", "model_sha256")):
+            expected = os.getenv(env_name)
+            if expected:
+                check(info.get(field) == expected, "VAL-L4-04", f"{field} provenance mismatch")
+
         payload = json.loads(FIXTURE.read_text())
         r = client.post("/predict", json=payload)
         check(r.status_code == 200, "VAL-L4-05", r.text)

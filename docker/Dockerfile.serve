@@ -9,7 +9,10 @@ COPY configs ./configs
 RUN pip install --no-cache-dir -e .
 
 COPY model.pkl /app/model.pkl
+COPY candidate-metadata.json /app/candidate-metadata.json
 ENV MODEL_PATH=/app/model.pkl
+ENV MODEL_METADATA_PATH=/app/candidate-metadata.json
+ENV REQUIRE_MODEL_METADATA=true
 
 EXPOSE 8000
 CMD ["uvicorn", "mlops.serving.app:app", "--host", "0.0.0.0", "--port", "8000"]

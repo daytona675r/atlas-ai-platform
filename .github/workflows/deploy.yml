@@ -27,7 +27,9 @@ jobs:
       ready: ${{ steps.check.outputs.ready }}
       source_run_id: ${{ steps.check.outputs.source_run_id }}
       source_sha: ${{ steps.check.outputs.source_sha }}
+      smoke_run_id: ${{ steps.check.outputs.smoke_run_id }}
     steps:
+      - uses: actions/checkout@v4
       - id: check
         env:
           HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
@@ -51,6 +53,10 @@ jobs:
           print(data["head_sha"])
           PY
           echo "source_sha=$(python -c 'import json; print(json.load(open("source-run.json"))["head_sha"])')" >> "$GITHUB_OUTPUT"
+          SOURCE_SHA=$(python -c 'import json; print(json.load(open("source-run.json"))["head_sha"])')
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/smoke.yml/runs?head_sha=${SOURCE_SHA}&per_page=100" > smoke-runs.json
+          python scripts/validate_smoke_run.py --runs-json smoke-runs.json --commit-sha "$SOURCE_SHA" > smoke-result.json
+          echo "smoke_run_id=$(python -c 'import json; print(json.load(open("smoke-result.json"))["id"])')" >> "$GITHUB_OUTPUT"
           if [[ -n "$HF_SPACE_REPO" && -n "$HF_SPACE_URL" && -n "$HF_TOKEN" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "HF Space deployment is configured."
@@ -100,12 +106,18 @@ jobs:
             --requested-run-id "${{ needs.configuration.outputs.source_run_id }}" > candidate-result.json
           test "$(git rev-parse HEAD)" = "$(python -c 'import json; print(json.load(open("candidate-result.json"))["commit_sha"])')"
           echo "run_id=$(python -c 'import json; print(json.load(open("candidate-result.json"))["run_id"])')" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(python -c 'import json; print(json.load(open("candidate-result.json"))["commit_sha"])')" >> "$GITHUB_OUTPUT"
+          echo "model_sha256=$(python -c 'import json; print(json.load(open("candidate-metadata.json"))["model_sha256"])')" >> "$GITHUB_OUTPUT"
 
       - name: Build and verify serving artifact locally
         run: |
           docker build -f docker/Dockerfile.serve -t mlops-serve .
           docker compose -f docker/docker-compose.verify.yml up -d --build
           for i in $(seq 1 30); do curl -sf http://localhost:8000/health && break; sleep 2; done
+          EXPECTED_COMMIT_SHA="$(python -c 'import json; print(json.load(open("candidate-result.json"))["commit_sha"])')" \
+          EXPECTED_SOURCE_RUN_ID="${{ needs.configuration.outputs.source_run_id }}" \
+          EXPECTED_MLFLOW_RUN_ID="$(python -c 'import json; print(json.load(open("candidate-result.json"))["run_id"])')" \
+          EXPECTED_MODEL_SHA256="$(python -c 'import json; print(json.load(open("candidate-metadata.json"))["model_sha256"])')" \
           SERVE_URL=http://localhost:8000 python scripts/verify_deploy.py
           docker compose -f docker/docker-compose.verify.yml down
 
@@ -123,12 +135,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Dockerfile model.pkl candidate-metadata.json pyproject.toml README.md src configs
-          git commit -m "Deploy validated candidate ${GITHUB_SHA}" || echo "No Space changes"
+          git commit -m "Deploy validated candidate ${{ steps.candidate.outputs.commit_sha }}" || echo "No Space changes"
           git push origin HEAD:main
 
       - name: Wait for hosted health and verify golden contract
         env:
           HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
+          EXPECTED_COMMIT_SHA: ${{ steps.candidate.outputs.commit_sha }}
+          EXPECTED_SOURCE_RUN_ID: ${{ needs.configuration.outputs.source_run_id }}
+          EXPECTED_MLFLOW_RUN_ID: ${{ steps.candidate.outputs.run_id }}
+          EXPECTED_MODEL_SHA256: ${{ steps.candidate.outputs.model_sha256 }}
         run: |
           export SERVE_URL="${HF_SPACE_URL%/}"
           for i in $(seq 1 60); do curl -sf "$SERVE_URL/health" && break; sleep 10; done
