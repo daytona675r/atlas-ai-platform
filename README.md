@@ -212,7 +212,11 @@ staging path. A successful full-train run hands off its exact `model.pkl` and
 immutable candidate metadata to the deployment workflow; the workflow verifies
 the local serving contract, pushes the same artifact to the configured Space,
 waits for hosted health and runs the Layer-4 inference/golden checks. Configure
-the repository variable `HF_SPACE_REPO` and secret `HF_TOKEN` before enabling
-the hosted stage. Without them, the workflow records an explicit skipped state
-instead of pretending that deployment occurred. Production alias promotion
-remains a protected, manual boundary after hosted verification.
+the repository variables `HF_SPACE_REPO` and `HF_SPACE_URL` plus secret
+`HF_TOKEN` before enabling the hosted stage. `HF_SPACE_URL` must be the actual
+`https://<space>.hf.space` runtime URL; the workflow never guesses it from the
+repository name. Manual dispatch also requires the exact successful Full Train
+run ID containing the candidate artifact. Without these values, the workflow
+records an explicit skipped state instead of pretending that deployment
+occurred. Production alias promotion remains a protected, manual MLflow
+operation after hosted verification.

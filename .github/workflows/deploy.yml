@@ -6,6 +6,10 @@ on:
     types: [completed]
   workflow_dispatch:
     inputs:
+      source_run_id:
+        description: Exact successful Full Train workflow run ID containing the candidate artifact
+        required: true
+        type: string
       production:
         description: Promote the verified candidate to the production alias
         type: boolean
@@ -21,13 +25,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ready: ${{ steps.check.outputs.ready }}
+      source_run_id: ${{ steps.check.outputs.source_run_id }}
     steps:
       - id: check
         env:
           HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
+          HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id || github.event.workflow_run.id }}
         run: |
-          if [[ -n "$HF_SPACE_REPO" && -n "$HF_TOKEN" ]]; then
+          echo "source_run_id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+          if [[ -n "$HF_SPACE_REPO" && -n "$HF_SPACE_URL" && -n "$HF_TOKEN" && -n "$SOURCE_RUN_ID" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "HF Space deployment is configured."
           else
@@ -38,6 +46,8 @@ jobs:
   deploy:
     needs: configuration
     if: needs.configuration.outputs.ready == 'true'
+    outputs:
+      candidate_run_id: ${{ steps.candidate.outputs.run_id }}
     runs-on: ubuntu-latest
     environment: staging
     steps:
@@ -47,42 +57,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e "[dev]" huggingface_hub
+      - run: pip install -e ".[dev]" huggingface_hub
 
       - name: Download exact validated candidate
-        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           name: model
           path: candidate
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.configuration.outputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create explicit candidate for manual dispatch
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          MLFLOW_DISABLED=1 python -m mlops.cli train --config configs/smoke.yaml > candidate-run-id
-          mkdir -p candidate
-          cp model.pkl candidate/model.pkl
-          python - <<'PY'
-          import hashlib, json, os
-          from pathlib import Path
-          Path("candidate/candidate-metadata.json").write_text(json.dumps({
-              "commit_sha": os.environ["GITHUB_SHA"],
-              "source_workflow": os.environ["GITHUB_WORKFLOW"],
-              "source_run_id": os.environ["GITHUB_RUN_ID"],
-              "run_id": Path("candidate-run-id").read_text().strip(),
-              "model_sha256": hashlib.sha256(Path("candidate/model.pkl").read_bytes()).hexdigest(),
-          }, indent=2) + "\n")
-          PY
-
       - name: Validate candidate handoff
+        id: candidate
         run: |
           test -s candidate/model.pkl
           test -s candidate/candidate-metadata.json
           cp candidate/model.pkl model.pkl
           cp candidate/candidate-metadata.json candidate-metadata.json
-          python -c 'import json; d=json.load(open("candidate-metadata.json")); assert d["run_id"] and d["model_sha256"]'
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          data = json.loads(Path("candidate-metadata.json").read_text())
+          assert data["run_id"] and data["model_sha256"]
+          actual = hashlib.sha256(Path("candidate/model.pkl").read_bytes()).hexdigest()
+          assert actual == data["model_sha256"], (actual, data["model_sha256"])
+          print(data["run_id"])
+          PY
+          echo "run_id=$(python -c 'import json; print(json.load(open("candidate-metadata.json"))["run_id"])')" >> "$GITHUB_OUTPUT"
 
       - name: Build and verify serving artifact locally
         run: |
@@ -99,7 +100,8 @@ jobs:
         run: |
           git clone "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_REPO}" hf-space
           cp docker/Dockerfile.serve hf-space/Dockerfile
-          cp model.pkl candidate-metadata.json pyproject.toml README.md hf-space/
+          cp deploy/space/README.md hf-space/README.md
+          cp model.pkl candidate-metadata.json pyproject.toml hf-space/
           cp -r src configs hf-space/
           cd hf-space
           git config user.name "github-actions[bot]"
@@ -110,9 +112,9 @@ jobs:
 
       - name: Wait for hosted health and verify golden contract
         env:
-          HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
+          HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
         run: |
-          export SERVE_URL="https://$(echo "$HF_SPACE_REPO" | tr '/' '-')"
+          export SERVE_URL="${HF_SPACE_URL%/}"
           for i in $(seq 1 60); do curl -sf "$SERVE_URL/health" && break; sleep 10; done
           curl --fail --silent --show-error "$SERVE_URL/health"
           SERVE_URL="$SERVE_URL" python scripts/verify_deploy.py
@@ -121,13 +123,14 @@ jobs:
         if: always()
         env:
           HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
+          HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
         run: |
           {
             echo '## Atlas staging deployment'
             echo "Commit: $GITHUB_SHA"
             echo "Source workflow run: ${{ github.event.workflow_run.id || github.run_id }}"
             echo "Candidate metadata: $(cat candidate-metadata.json 2>/dev/null || echo unavailable)"
-            echo "Target Space: https://huggingface.co/spaces/${HF_SPACE_REPO}"
+            echo "Target Space: ${HF_SPACE_URL}"
             echo 'Hosted verification runs before any promotion step.'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -137,6 +140,33 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - run: |
-          echo 'Production promotion is intentionally gated behind the staging verification job.'
-          echo 'Use the verified candidate run/alias in the protected MLflow environment.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - name: Promote exact verified candidate
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+          CANDIDATE_RUN_ID: ${{ needs.deploy.outputs.candidate_run_id }}
+        run: |
+          test -n "$MLFLOW_TRACKING_URI"
+          test -n "$CANDIDATE_RUN_ID"
+          python - <<'PY'
+          import os
+          import mlflow
+          from mlflow.tracking import MlflowClient
+          from mlops.config import REPO_ROOT, load_yaml
+
+          model_name = load_yaml(REPO_ROOT / "configs/validation_thresholds.yaml")["registry_model_name"]
+          client = MlflowClient()
+          versions = client.search_model_versions(f"name='{model_name}'")
+          matches = [version for version in versions if version.run_id == os.environ["CANDIDATE_RUN_ID"]]
+          if not matches:
+              raise SystemExit("exact verified candidate is not registered; refusing promotion")
+          version = matches[-1]
+          client.set_registered_model_alias(model_name, "production", version.version)
+          print(f"promoted {model_name} v{version.version} from {version.run_id}")
+          PY
