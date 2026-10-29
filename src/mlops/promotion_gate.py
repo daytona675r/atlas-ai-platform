@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -79,7 +80,7 @@ def check_champion(run_id: str, thresholds: dict[str, Any]) -> tuple[bool, str]:
 
     delta = float(thresholds.get("champion_improvement_min", 0.0))
     required = champion + delta
-    if new_f1 >= required:
+    if new_f1 >= required or math.isclose(new_f1, required, abs_tol=1e-9):
         return True, f"new f1 {new_f1:.4f} >= champion {champion:.4f} + {delta:.4f}"
     return False, f"new f1 {new_f1:.4f} < champion {champion:.4f} + {delta:.4f}"
 
