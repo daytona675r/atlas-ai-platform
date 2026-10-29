@@ -53,11 +53,11 @@ def test_validate_layer1_smoke_is_deterministic(monkeypatch, tmp_path: Path) -> 
     assert len(validate_data.validate_layer1(tmp_path / "manifest.yaml", "smoke")) == 600
 
 
-def test_promotion_gate_handles_missing_and_regressing_champion(monkeypatch) -> None:
+def test_promotion_gate_allows_explicit_first_model_bootstrap(monkeypatch) -> None:
     run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
     client = SimpleNamespace(
         get_run=lambda _: run,
-        get_latest_versions=lambda *_args, **_kwargs: [],
+        get_model_version_by_alias=lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyError("missing")),
     )
     monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
     assert get_champion_f1(client, "model") is None
@@ -89,10 +89,78 @@ def test_promotion_gate_rejects_regression(monkeypatch) -> None:
     version = SimpleNamespace(run_id="champion")
     client = SimpleNamespace(
         get_run=lambda run_id: challenger if run_id == "run" else champion_run,
-        get_latest_versions=lambda *_args, **_kwargs: [version],
+        get_model_version_by_alias=lambda *_args, **_kwargs: version,
     )
     monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
     ok, message = check_champion(
         "run", {"registry_model_name": "model", "champion_improvement_min": 0.0}
     )
     assert not ok and "< champion" in message
+
+
+def test_promotion_gate_uses_production_alias_and_improvement_delta(monkeypatch) -> None:
+    candidate = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.82}))
+    champion = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    version = SimpleNamespace(run_id="champion")
+    calls: list[tuple[str, str]] = []
+    client = SimpleNamespace(
+        get_run=lambda run_id: candidate if run_id == "run" else champion,
+        get_model_version_by_alias=lambda model, alias: calls.append((model, alias)) or version,
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    ok, _ = check_champion(
+        "run", {"registry_model_name": "model", "champion_improvement_min": 0.02}
+    )
+    assert ok
+    assert calls == [("model", "production")]
+
+
+def test_promotion_gate_rejects_equal_when_positive_improvement_required(monkeypatch) -> None:
+    candidate = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    champion = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    client = SimpleNamespace(
+        get_run=lambda run_id: candidate if run_id == "run" else champion,
+        get_model_version_by_alias=lambda *_args: SimpleNamespace(run_id="champion"),
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    ok, _ = check_champion(
+        "run", {"registry_model_name": "model", "champion_improvement_min": 0.02}
+    )
+    assert not ok
+
+
+def test_promotion_gate_allows_tie_when_delta_is_zero(monkeypatch) -> None:
+    run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    client = SimpleNamespace(
+        get_run=lambda _: run,
+        get_model_version_by_alias=lambda *_args: SimpleNamespace(run_id="champion"),
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    assert check_champion(
+        "run", {"registry_model_name": "model", "champion_improvement_min": 0}
+    )[0]
+
+
+def test_promotion_gate_fails_closed_for_missing_champion_metric(monkeypatch) -> None:
+    candidate = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    champion = SimpleNamespace(data=SimpleNamespace(metrics={}))
+    client = SimpleNamespace(
+        get_run=lambda run_id: candidate if run_id == "run" else champion,
+        get_model_version_by_alias=lambda *_args: SimpleNamespace(run_id="champion"),
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    ok, message = check_champion("run", {"registry_model_name": "model"})
+    assert not ok and "missing test_f1" in message
+
+
+def test_promotion_gate_fails_closed_for_remote_error(monkeypatch) -> None:
+    run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    client = SimpleNamespace(
+        get_run=lambda _: run,
+        get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(
+            RuntimeError("permission denied")
+        ),
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    ok, message = check_champion("run", {"registry_model_name": "model"})
+    assert not ok and "lookup failed" in message
