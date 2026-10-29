@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mode", choices=["smoke", "full"], required=True)
     args = parser.parse_args(argv)
     try:
-        validate_layer1(Path(args.config), args.mode)
+        df = validate_layer1(Path(args.config), args.mode)
         print(
             f"VAL-L1 passed ({args.mode}); "
             f"raw duplicate groups={df.attrs.get('raw_feature_duplicate_groups', 0)}, "
