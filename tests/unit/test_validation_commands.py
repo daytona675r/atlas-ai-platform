@@ -57,7 +57,9 @@ def test_promotion_gate_allows_explicit_first_model_bootstrap(monkeypatch) -> No
     run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
     client = SimpleNamespace(
         get_run=lambda _: run,
-        get_model_version_by_alias=lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyError("missing")),
+        get_model_version_by_alias=lambda *_args, **_kwargs: (
+            _ for _ in ()
+        ).throw(KeyError("missing")),
     )
     monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
     assert get_champion_f1(client, "model") is None
