@@ -7,7 +7,8 @@ from typing import Any
 
 def select_exact_smoke_run(runs: list[dict[str, Any]], commit_sha: str) -> dict[str, Any]:
     matches = [
-        run for run in runs
+        run
+        for run in runs
         if run.get("name") == "Smoke CI"
         and run.get("head_sha") == commit_sha
         and run.get("status") == "completed"
