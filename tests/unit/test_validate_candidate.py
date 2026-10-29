@@ -1,7 +1,8 @@
 import hashlib
 
 import pytest
-from scripts.validate_candidate import validate_candidate
+
+from mlops.candidate_validation import validate_candidate
 
 RUN = {
     "id": 42,
