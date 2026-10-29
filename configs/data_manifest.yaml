@@ -31,4 +31,9 @@ minority_class_min:
 missing_rate_max:
   smoke_any_feature: 0.10
   full_default: 0.05
+  full_workclass: 0.06
+  full_occupation: 0.06
   full_native_country: 0.15
+known_feature_duplicate_groups: 24
+known_feature_duplicate_rows: 25
+cleaning_policy: "drop duplicate feature vectors, keep first raw occurrence"

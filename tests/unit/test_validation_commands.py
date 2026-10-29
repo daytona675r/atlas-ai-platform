@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 from mlops import cli
 from mlops.promotion_gate import check_champion, get_champion_f1
@@ -51,6 +52,68 @@ def test_validate_layer1_smoke_is_deterministic(monkeypatch, tmp_path: Path) -> 
     monkeypatch.setattr(validate_data, "load_adult_dataframe", lambda _: frame.copy())
     monkeypatch.setattr(validate_data, "REPO_ROOT", tmp_path)
     assert len(validate_data.validate_layer1(tmp_path / "manifest.yaml", "smoke")) == 600
+
+
+def test_validate_layer1_full_audits_known_missingness_and_deduplicates(
+    monkeypatch, tmp_path: Path
+) -> None:
+    frame = _frame()
+    frame.loc[:33, "workclass"] = None
+    frame.loc[:33, "occupation"] = None
+    frame = pd.concat([frame, frame.iloc[[100]]], ignore_index=True)
+    config = {
+        "sha256": "digest",
+        "columns": list(frame.columns),
+        "row_count": {"full_min": 500, "full_max": 2000},
+        "minority_class_min": {"full": 0.2},
+        "missing_rate_max": {
+            "full_default": 0.05,
+            "full_workclass": 0.06,
+            "full_occupation": 0.06,
+            "full_native_country": 0.15,
+        },
+        "known_feature_duplicate_groups": 1,
+        "known_feature_duplicate_rows": 1,
+        "target": "income",
+        "positive_label": ">50K",
+    }
+    cache = tmp_path / "adult.data"
+    cache.write_text("fixture", encoding="utf-8")
+    monkeypatch.setattr(validate_data, "load_yaml", lambda _: config)
+    monkeypatch.setattr(validate_data, "download_dataset", lambda _: cache)
+    monkeypatch.setattr(validate_data, "file_sha256", lambda _: "digest")
+    monkeypatch.setattr(validate_data, "load_adult_dataframe", lambda _: frame.copy())
+    result = validate_data.validate_layer1(tmp_path / "manifest.yaml", "full")
+    assert len(result) == 600
+    assert result.attrs["raw_feature_duplicate_groups"] == 1
+
+
+def test_validate_layer1_full_rejects_unexpected_duplicate(monkeypatch, tmp_path: Path) -> None:
+    frame = pd.concat([_frame(), _frame().iloc[[100]]], ignore_index=True)
+    config = {
+        "sha256": "digest",
+        "columns": list(frame.columns),
+        "row_count": {"full_min": 500, "full_max": 2000},
+        "minority_class_min": {"full": 0.2},
+        "missing_rate_max": {
+            "full_default": 0.05,
+            "full_workclass": 0.06,
+            "full_occupation": 0.06,
+            "full_native_country": 0.15,
+        },
+        "known_feature_duplicate_groups": 0,
+        "known_feature_duplicate_rows": 0,
+        "target": "income",
+        "positive_label": ">50K",
+    }
+    cache = tmp_path / "adult.data"
+    cache.write_text("fixture", encoding="utf-8")
+    monkeypatch.setattr(validate_data, "load_yaml", lambda _: config)
+    monkeypatch.setattr(validate_data, "download_dataset", lambda _: cache)
+    monkeypatch.setattr(validate_data, "file_sha256", lambda _: "digest")
+    monkeypatch.setattr(validate_data, "load_adult_dataframe", lambda _: frame.copy())
+    with pytest.raises(validate_data.ValidationError, match="VAL-L1-17"):
+        validate_data.validate_layer1(tmp_path / "manifest.yaml", "full")
 
 
 def test_promotion_gate_allows_explicit_first_model_bootstrap(monkeypatch) -> None:

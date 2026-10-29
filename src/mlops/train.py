@@ -9,6 +9,7 @@ import mlflow
 from mlflow.models import infer_signature
 
 from mlops.config import REPO_ROOT, file_sha256, load_yaml
+from mlops.data.clean import cleaned_data_fingerprint, deduplicate_feature_vectors
 from mlops.data.loaders import download_dataset, load_adult_dataframe
 from mlops.data.split import split_dataframe
 from mlops.metrics import compute_metrics, encode_labels
@@ -37,6 +38,8 @@ def run_training(config_path: Path | str) -> str:
     max_rows = cfg.get("max_rows") if cfg.get("mode") == "smoke" else None
     df = load_adult_dataframe(max_rows=max_rows)
     target = manifest["target"]
+    df = deduplicate_feature_vectors(df, feature_columns())
+    cleaned_data_sha = cleaned_data_fingerprint(df)
     train_df, val_df, test_df = split_dataframe(
         df,
         target=target,
@@ -80,6 +83,7 @@ def run_training(config_path: Path | str) -> str:
                 {
                     "mode": cfg.get("mode", "unknown"),
                     "data_sha256": data_sha,
+                    "cleaned_data_sha256": cleaned_data_sha,
                     "config_hash": file_sha256(Path(config_path)),
                     "git_sha": _git_sha(),
                     "random_state": cfg["random_state"],

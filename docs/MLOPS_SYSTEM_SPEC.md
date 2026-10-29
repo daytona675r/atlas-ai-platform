@@ -16,6 +16,12 @@ validation_layers: 4
 - Reproducible smoke vs full training on UCI Adult (tabular classification).
 - Free-tier discipline: GitHub Actions, DagsHub MLflow, HCP Terraform, optional AWS S3 via OIDC.
 - Agent- and human-readable: stable IDs (`FR-*`, `VAL-L*-*`), configs in Git.
+- The pinned UCI Adult source contains known missing categorical values and 24
+  duplicate feature groups (25 extra rows). Full validation audits those exact
+  counts, permits only the documented `workclass`/`occupation` caps, then drops
+  duplicate feature vectors deterministically (keep first raw occurrence).
+  Training uses the same cleaning function; the cleaned-data fingerprint is
+  reported by the validator. Remaining unexpected duplicates fail VAL-L1-17.
 
 ## non_goals {#non_goals}
 
@@ -100,12 +106,12 @@ Gate rules:
 | VAL-L1-10 | age 17–90 |
 | VAL-L1-11 | hours-per-week 1–99 |
 | VAL-L1-12 | education-num ≥ 0 |
-| VAL-L1-13 | Missing rate caps |
+| VAL-L1-13 | Missing rate caps (feature-specific caps for pinned UCI fields) |
 | VAL-L1-14 | No all-null features |
 | VAL-L1-15 | No constant features |
 | VAL-L1-16 | Categorical cardinality ≤ 100 |
-| VAL-L1-17 | No duplicate feature rows |
-| VAL-L1-18 | Stratified split reproducibility |
+| VAL-L1-17 | Raw duplicate audit matches manifest; cleaned data has no duplicate feature rows |
+| VAL-L1-18 | Train/test feature keys are disjoint after deterministic cleaning |
 
 ### Layer 2 — Smoke pipeline
 

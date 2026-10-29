@@ -7,6 +7,11 @@ from pathlib import Path
 import pandas as pd
 
 from mlops.config import REPO_ROOT, file_sha256, load_yaml
+from mlops.data.clean import (
+    cleaned_data_fingerprint,
+    deduplicate_feature_vectors,
+    feature_duplicate_counts,
+)
 from mlops.data.loaders import download_dataset, load_adult_dataframe
 from mlops.data.split import split_dataframe
 from mlops.models.pipeline import feature_columns
@@ -82,6 +87,8 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
         cap = miss_cap
         if mode == "full" and col == "native-country":
             cap = cfg["missing_rate_max"]["full_native_country"]
+        elif mode == "full" and col in {"workclass", "occupation"}:
+            cap = cfg["missing_rate_max"][f"full_{col}"]
         elif mode == "full":
             cap = cfg["missing_rate_max"]["full_default"]
         _check(
@@ -111,8 +118,21 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
         if col not in numeric_columns:
             _check(df[col].nunique(dropna=True) <= 100, "VAL-L1-16", f"{col} cardinality")
 
-    feature_hash = df[features].apply(lambda row: "|".join(map(str, row.tolist())), axis=1)
-    _check(not feature_hash.duplicated().any(), "VAL-L1-17", "duplicate feature rows")
+    if mode == "smoke":
+        duplicate_groups = duplicate_rows = 0
+        df = deduplicate_feature_vectors(df, features)
+    else:
+        duplicate_groups, duplicate_rows = feature_duplicate_counts(df, features)
+    expected_groups = int(cfg.get("known_feature_duplicate_groups", 0)) if mode == "full" else 0
+    expected_rows = int(cfg.get("known_feature_duplicate_rows", 0)) if mode == "full" else 0
+    _check(
+        duplicate_groups == expected_groups and duplicate_rows == expected_rows,
+        "VAL-L1-17",
+        f"feature duplicate audit groups={duplicate_groups} rows={duplicate_rows}; "
+        f"expected groups={expected_groups} rows={expected_rows}",
+    )
+    df = deduplicate_feature_vectors(df, features)
+    cleaned_fingerprint = cleaned_data_fingerprint(df)
 
     train_df, val_df, test_df = split_dataframe(
         df,
@@ -126,6 +146,9 @@ def validate_layer1(manifest_path: Path, mode: str) -> pd.DataFrame:
     test_keys = set(test_df[features].apply(lambda row: "|".join(map(str, row.tolist())), axis=1))
     _check(train_keys.isdisjoint(test_keys), "VAL-L1-18", "train/test overlap")
 
+    df.attrs["raw_feature_duplicate_groups"] = duplicate_groups
+    df.attrs["raw_feature_duplicate_rows"] = duplicate_rows
+    df.attrs["cleaned_data_fingerprint"] = cleaned_fingerprint
     return df
 
 
@@ -136,7 +159,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         validate_layer1(Path(args.config), args.mode)
-        print(f"VAL-L1 passed ({args.mode})")
+        print(
+            f"VAL-L1 passed ({args.mode}); "
+            f"raw duplicate groups={df.attrs.get('raw_feature_duplicate_groups', 0)}, "
+            f"extra rows={df.attrs.get('raw_feature_duplicate_rows', 0)}, "
+            f"cleaned fingerprint={df.attrs.get('cleaned_data_fingerprint', 'n/a')}"
+        )
         return 0
     except ValidationError as e:
         print(str(e), file=sys.stderr)
