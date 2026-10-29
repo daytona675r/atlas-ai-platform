@@ -57,9 +57,9 @@ def test_promotion_gate_allows_explicit_first_model_bootstrap(monkeypatch) -> No
     run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
     client = SimpleNamespace(
         get_run=lambda _: run,
-        get_model_version_by_alias=lambda *_args, **_kwargs: (
-            _ for _ in ()
-        ).throw(KeyError("missing")),
+        get_model_version_by_alias=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            KeyError("missing")
+        ),
     )
     monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
     assert get_champion_f1(client, "model") is None
@@ -138,9 +138,7 @@ def test_promotion_gate_allows_tie_when_delta_is_zero(monkeypatch) -> None:
         get_model_version_by_alias=lambda *_args: SimpleNamespace(run_id="champion"),
     )
     monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
-    assert check_champion(
-        "run", {"registry_model_name": "model", "champion_improvement_min": 0}
-    )[0]
+    assert check_champion("run", {"registry_model_name": "model", "champion_improvement_min": 0})[0]
 
 
 def test_promotion_gate_fails_closed_for_missing_champion_metric(monkeypatch) -> None:
