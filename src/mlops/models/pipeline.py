@@ -32,6 +32,14 @@ def feature_columns() -> list[str]:
 def build_model_pipeline(model_cfg: dict[str, Any]) -> Pipeline:
     numeric = ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
     categorical = [c for c in feature_columns() if c not in numeric]
+    model_type = model_cfg.get("type", "logistic_regression")
+    # HistGradientBoostingClassifier only accepts dense arrays. Keep the
+    # default sparse representation for logistic regression, but make the
+    # estimator-specific contract explicit rather than changing the model.
+    onehot = OneHotEncoder(
+        handle_unknown="ignore",
+        sparse_output=model_type != "hist_gradient_boosting",
+    )
     preprocessor = ColumnTransformer(
         transformers=[
             (
@@ -49,14 +57,13 @@ def build_model_pipeline(model_cfg: dict[str, Any]) -> Pipeline:
                 Pipeline(
                     [
                         ("imputer", SimpleImputer(strategy="most_frequent")),
-                        ("onehot", OneHotEncoder(handle_unknown="ignore")),
+                        ("onehot", onehot),
                     ]
                 ),
                 categorical,
             ),
         ]
     )
-    model_type = model_cfg.get("type", "logistic_regression")
     if model_type == "hist_gradient_boosting":
         clf: Any = HistGradientBoostingClassifier(
             max_iter=model_cfg.get("max_iter", 100),

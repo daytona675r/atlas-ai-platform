@@ -32,11 +32,18 @@ jobs:
       - name: Full train
         id: train
         run: |
+          set -euo pipefail
           if [ -z "$MLFLOW_TRACKING_URI" ]; then
             echo "MLFLOW_TRACKING_URI required for full train" >&2
             exit 1
           fi
-          RUN_ID=$(python -m mlops.cli train --config configs/full.yaml | tail -1)
+          python -m mlops.cli train --config configs/full.yaml > train-output.txt
+          RUN_ID=$(tail -n 1 train-output.txt)
+          if [[ ! "$RUN_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "Full train did not return a valid MLflow run ID: '$RUN_ID'" >&2
+            exit 1
+          fi
+          test -s model.pkl
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
       - name: VAL-L3 Run validation
@@ -46,10 +53,12 @@ jobs:
         run: python -m mlops.cli register --run-id ${{ steps.train.outputs.run_id }}
 
       - name: Write candidate metadata
-        if: ${{ always() && steps.train.outcome == 'success' }}
         env:
           CANDIDATE_RUN_ID: ${{ steps.train.outputs.run_id }}
         run: |
+          set -euo pipefail
+          test -s model.pkl
+          test -n "$CANDIDATE_RUN_ID"
           python - <<'PY'
           import hashlib, json, os
           from pathlib import Path
