@@ -98,11 +98,18 @@ def run_training(config_path: Path | str) -> str:
                 for k, v in metrics.items():
                     mlflow.log_metric(f"{prefix}_{k}", v)
             signature = infer_signature(x_test, test_pred)
-            mlflow.sklearn.log_model(
-                pipeline,
-                artifact_path="model",
-                signature=signature,
-                input_example=x_test.head(5),
-            )
+            log_model_kwargs = {
+                "artifact_path": "model",
+                "signature": signature,
+                "input_example": x_test.head(5),
+            }
+            if cfg["model"].get("type") == "hist_gradient_boosting":
+                # These are the concrete sklearn types created by our own
+                # configured estimator and reviewed for this trusted artifact.
+                log_model_kwargs["skops_trusted_types"] = [
+                    "numpy.dtype",
+                    "sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor",
+                ]
+            mlflow.sklearn.log_model(pipeline, **log_model_kwargs)
             mlflow.log_artifact(str(test_path), artifact_path="data")
     return run_id
