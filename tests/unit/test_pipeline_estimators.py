@@ -35,6 +35,8 @@ def test_hist_gradient_boosting_full_config_fits_and_predicts() -> None:
 
 def test_logistic_regression_keeps_sparse_preprocessing_contract() -> None:
     model = build_model_pipeline({"type": "logistic_regression", "max_iter": 5})
-    transformers = dict(model.named_steps["preprocess"].transformers)
+    transformers = {
+        name: transformer for name, transformer, _ in model.named_steps["preprocess"].transformers
+    }
     encoder = transformers["cat"].named_steps["onehot"]
     assert encoder.sparse_output is True
