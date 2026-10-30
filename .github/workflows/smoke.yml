@@ -46,6 +46,9 @@ jobs:
       - name: VAL-L1 Data validation
         run: python -m mlops.cli validate-data --mode smoke
 
+      - name: VAL-L1 Full data contract
+        run: python -m mlops.cli validate-data --mode full
+
       - name: VAL-L2-03 Unit tests
         run: MLFLOW_DISABLED=1 pytest tests/unit tests/contract --cov=mlops --cov-report=xml --cov-report=term-missing --cov-fail-under=35
 
