@@ -30,6 +30,11 @@ jobs:
       smoke_run_id: ${{ steps.check.outputs.smoke_run_id }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install validation helpers
+        run: pip install -e "."
       - id: check
         env:
           HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
