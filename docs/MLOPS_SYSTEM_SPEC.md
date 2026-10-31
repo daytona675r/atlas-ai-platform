@@ -41,14 +41,14 @@ validation_layers: 4
 | FR-004 | VAL-L3 registers `@staging`; hosted VAL-L4 is required before `@production` |
 | FR-005 | Champion comparison (VAL-L3-11) |
 | FR-006 | Terraform state on HCP; AWS via OIDC only |
-| FR-007 | CD to Hugging Face Spaces after VAL-L4 |
+| FR-007 | CD to Render after VAL-L4 |
 
 ### Non-functional
 
 | ID | Requirement |
 |----|-------------|
 | NFR-001 | Smoke (L1+L2) &lt; 10 min on `ubuntu-latest` |
-| NFR-002 | No secrets in repo; DagsHub/HF via GitHub Secrets |
+| NFR-002 | No secrets in repo; DagsHub/Render via GitHub Secrets |
 | NFR-003 | Every validation check has stable `VAL-L*-*` ID |
 | NFR-004 | $0 monthly at idle |
 | NFR-005 | Fork + secrets only — no local install required |
@@ -64,11 +64,11 @@ validation_layers: 4
 | AWS S3 (optional) | Extra storage | Free tier 12mo | `modules/storage` |
 | Docker | Train/serve images | Free in CI | `docker/` |
 | sklearn / pandas | ML + data | OSS | `src/mlops/` |
-| Hugging Face Spaces | Serving | Free tier | `deploy.yml` |
+| Render Free | Serving | Free tier | `deploy.yml` |
 
 ## architecture {#architecture}
 
-See [README.md](../README.md) for the diagram. Flow: PR → `smoke.yml` (L1,L2) → `train.yml` (L1, train, L3, register `@staging`) → `deploy.yml` (exact Smoke prerequisite, local L4, HF hosted L4).
+See [README.md](../README.md) for the diagram. Flow: PR → `smoke.yml` (L1,L2) → `train.yml` (L1, train, L3, register `@staging`) → `deploy.yml` (exact Smoke prerequisite, local L4, pinned Render release branch, hosted L4).
 
 ## pipelines {#pipelines}
 
@@ -76,7 +76,7 @@ See [README.md](../README.md) for the diagram. Flow: PR → `smoke.yml` (L1,L2) 
 |----------|---------|-------|
 | `smoke.yml` | PR, push `main`, `v*` tags, manual | VAL-L1 → VAL-L2 |
 | `train.yml` | `v*` tags, manual | VAL-L1 → train → VAL-L3 → register `@staging` |
-| `deploy.yml` | after train, manual | VAL-L4 → HF deploy → VAL-L4 preflight → `@production` |
+| `deploy.yml` | after train, manual | VAL-L4 → Render release branch + deploy hook → hosted L4 → `@production` |
 | `terraform-plan.yml` | PR touching `infra/**` | `fmt`, `init -backend=false`, `validate` |
 
 ## validation {#validation}
@@ -87,7 +87,7 @@ Gate rules:
 |---------|--------|
 | L1 or L2 | CI build |
 | L3 | Registration / `@staging` |
-| L4 | Hosted deployment verification (when HF configuration is present) |
+| L4 | Hosted deployment verification (when Render configuration is present) |
 | L4 preflight | `@staging` → `@production` |
 
 ### Layer 1 — Data (`validate_data.py`)
@@ -157,7 +157,7 @@ Gate rules:
 ## decision_gates {#decision_gates}
 
 1. VAL-L3 pass → register model `adult-income` version → alias `@staging`.
-2. Deploy validates the exact Full Train artifact locally, then performs hosted L4 checks when HF configuration is available.
+2. Deploy validates the exact Full Train artifact locally, publishes a pinned Render release branch, then performs hosted L4 checks.
 3. Only a verified candidate may be promoted to the `@production` alias by the protected manual path.
 
 ## iac_map {#iac_map}
@@ -175,14 +175,14 @@ See [docs/CREDENTIALS.md](CREDENTIALS.md) and [infra/terraform/README.md](../inf
 ## open_questions {#open_questions}
 
 - ADR-002: DagsHub-only vs AWS S3 for artifacts (default: DagsHub).
-- HF Space repository and runtime URL (set in `HF_SPACE_REPO` and `HF_SPACE_URL`).
+- Render service URL and owner-only deploy hook (set in `RENDER_SERVICE_URL` and `RENDER_DEPLOY_HOOK`).
 
 ## implementation_status {#implementation_status}
 
 Implemented and enforced: data validation, lint/type/unit checks, smoke
 training, Docker build/import, full-train run validation, champion comparison,
 artifact hash/provenance checks, exact Smoke-CI prerequisite validation and
-local serving verification. Hosted HF verification and production promotion
+local serving verification. Hosted Render verification and production promotion
 remain configuration-dependent; there is no confirmed hosted run or public
 endpoint in this repository yet.
 

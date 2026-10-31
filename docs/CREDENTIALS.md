@@ -7,21 +7,23 @@
 | `MLFLOW_TRACKING_URI` | smoke, train | DagsHub MLflow endpoint |
 | `MLFLOW_TRACKING_USERNAME` | smoke, train | DagsHub user |
 | `MLFLOW_TRACKING_PASSWORD` | smoke, train | DagsHub token |
-| `HF_TOKEN` | deploy | Hugging Face API |
+| `RENDER_DEPLOY_HOOK` | deploy | Owner-only Render deploy hook for the linked service |
 | `AWS_ROLE_ARN` | terraform | OIDC assumable role (optional S3) |
 
 ## GitHub Variables
 
 | Variable | Example |
 |----------|---------|
-| `HF_SPACE_REPO` | `your-user/adult-income-api` |
-| `HF_SPACE_URL` | `https://your-user-adult-income-api.hf.space` |
+| `RENDER_SERVICE_URL` | `https://atlas-ai-platform-demo.onrender.com` |
+| `RENDER_RELEASE_BRANCH` | `render-release` |
 | `MLFLOW_REGISTRY_MODEL` | `adult-income` |
 
-`HF_SPACE_REPO`, `HF_SPACE_URL` and `HF_TOKEN` are required for the hosted
-deployment stage. Until they are configured and a hosted run is verified, the
-deployment workflow records an explicit skipped state; no public endpoint is
-assumed.
+`RENDER_SERVICE_URL` and `RENDER_DEPLOY_HOOK` are required for the hosted
+deployment stage. Configure the existing Render service
+`atlas-ai-platform-demo` to track `render-release` with auto-deploy disabled.
+The workflow updates that branch only after the exact Full Train candidate has
+passed local validation, then invokes the owner-only hook. Until a hosted
+Layer-4 run is verified, no public demo claim is made.
 
 ## Workflow injection
 

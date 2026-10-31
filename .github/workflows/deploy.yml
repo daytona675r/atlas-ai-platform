@@ -37,9 +37,9 @@ jobs:
         run: pip install -e "."
       - id: check
         env:
-          HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
-          HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RENDER_SERVICE_URL: ${{ vars.RENDER_SERVICE_URL }}
+          RENDER_RELEASE_BRANCH: ${{ vars.RENDER_RELEASE_BRANCH }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id || github.event.workflow_run.id }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -62,19 +62,21 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/smoke.yml/runs?head_sha=${SOURCE_SHA}&per_page=100" > smoke-runs.json
           python scripts/validate_smoke_run.py --runs-json smoke-runs.json --commit-sha "$SOURCE_SHA" > smoke-result.json
           echo "smoke_run_id=$(python -c 'import json; print(json.load(open("smoke-result.json"))["id"])')" >> "$GITHUB_OUTPUT"
-          if [[ -n "$HF_SPACE_REPO" && -n "$HF_SPACE_URL" && -n "$HF_TOKEN" ]]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-            echo "HF Space deployment is configured."
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Deployment skipped: configure HF_SPACE_REPO and HF_TOKEN before enabling hosted CD." >> "$GITHUB_STEP_SUMMARY"
+          if [[ -z "$RENDER_SERVICE_URL" || -z "$RENDER_DEPLOY_HOOK" ]]; then
+            echo "Render deployment is not configured. Set RENDER_SERVICE_URL and the RENDER_DEPLOY_HOOK secret." >&2
+            exit 1
           fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "Render deployment is configured for branch ${RENDER_RELEASE_BRANCH:-render-release}."
 
   deploy:
     needs: configuration
     if: needs.configuration.outputs.ready == 'true'
     outputs:
       candidate_run_id: ${{ steps.candidate.outputs.run_id }}
+    permissions:
+      contents: write
+      actions: read
     runs-on: ubuntu-latest
     environment: staging
     steps:
@@ -84,7 +86,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e ".[dev]" huggingface_hub
+      - run: pip install -e ".[dev]"
 
       - name: Download exact validated candidate
         uses: actions/download-artifact@v4
@@ -126,49 +128,61 @@ jobs:
           SERVE_URL=http://localhost:8000 python scripts/verify_deploy.py
           docker compose -f docker/docker-compose.verify.yml down
 
-      - name: Deploy Docker Space
+      - name: Publish immutable Render release branch
         env:
-          HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          RENDER_RELEASE_BRANCH: ${{ vars.RENDER_RELEASE_BRANCH || 'render-release' }}
+          SOURCE_SHA: ${{ needs.configuration.outputs.source_sha }}
         run: |
-          git clone "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_REPO}" hf-space
-          cp docker/Dockerfile.serve hf-space/Dockerfile
-          cp deploy/space/README.md hf-space/README.md
-          cp model.pkl candidate-metadata.json pyproject.toml hf-space/
-          cp -r src configs hf-space/
-          cd hf-space
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Dockerfile model.pkl candidate-metadata.json pyproject.toml README.md src configs
-          git commit -m "Deploy validated candidate ${{ steps.candidate.outputs.commit_sha }}" || echo "No Space changes"
-          git push origin HEAD:main
+          git fetch origin "$RENDER_RELEASE_BRANCH" || true
+          git checkout -B "$RENDER_RELEASE_BRANCH" "$SOURCE_SHA"
+          test -s model.pkl
+          test -s candidate-metadata.json
+          git add model.pkl candidate-metadata.json
+          git commit -m "Render release $SOURCE_SHA" || echo "Release artifacts already present"
+          git push --force-with-lease origin "HEAD:refs/heads/$RENDER_RELEASE_BRANCH"
+
+      - name: Trigger Render deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" > render-deploy.json
+          cat render-deploy.json
 
       - name: Wait for hosted health and verify golden contract
         env:
-          HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
+          RENDER_SERVICE_URL: ${{ vars.RENDER_SERVICE_URL }}
           EXPECTED_COMMIT_SHA: ${{ steps.candidate.outputs.commit_sha }}
           EXPECTED_SOURCE_RUN_ID: ${{ needs.configuration.outputs.source_run_id }}
           EXPECTED_MLFLOW_RUN_ID: ${{ steps.candidate.outputs.run_id }}
           EXPECTED_MODEL_SHA256: ${{ steps.candidate.outputs.model_sha256 }}
         run: |
-          export SERVE_URL="${HF_SPACE_URL%/}"
-          for i in $(seq 1 60); do curl -sf "$SERVE_URL/health" && break; sleep 10; done
+          set -euo pipefail
+          export SERVE_URL="${RENDER_SERVICE_URL%/}"
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf "$SERVE_URL/health"; then ready=true; break; fi
+            sleep 10
+          done
+          [[ "$ready" == true ]]
           curl --fail --silent --show-error "$SERVE_URL/health"
           SERVE_URL="$SERVE_URL" python scripts/verify_deploy.py
 
       - name: Deployment summary
         if: always()
         env:
-          HF_SPACE_REPO: ${{ vars.HF_SPACE_REPO }}
-          HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
+          RENDER_SERVICE_URL: ${{ vars.RENDER_SERVICE_URL }}
         run: |
           {
             echo '## Atlas staging deployment'
             echo "Candidate commit: $(python -c 'import json; print(json.load(open("candidate-result.json"))["commit_sha"])' 2>/dev/null || echo unavailable)"
             echo "Source Full Train run: ${{ needs.configuration.outputs.source_run_id }}"
             echo "Candidate metadata: $(cat candidate-metadata.json 2>/dev/null || echo unavailable)"
-            echo "Target Space: ${HF_SPACE_URL}"
-            echo 'Hosted verification runs before any promotion step.'
+            echo "Render service: ${RENDER_SERVICE_URL}"
+            echo 'Hosted Layer 4 verification runs before any promotion step.'
           } >> "$GITHUB_STEP_SUMMARY"
 
   promote-production:

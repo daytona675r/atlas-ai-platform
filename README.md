@@ -30,10 +30,10 @@ Atlas is a focused engineering reference implementation. It separates checks
 that run in credential-free CI from optional cloud and hosted stages, so a green
 local pipeline is never presented as proof of a hosted deployment.
 
-Current evidence: [Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/runs/40929514856)
-and [Portfolio Acceptance](https://github.com/daytona675r/atlas-ai-platform/actions/runs/40929514389)
-are green on the current main branch. A confirmed Hugging Face hosted run and
-public endpoint are still pending owner configuration and issue #4.
+Current evidence: [Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41216785957)
+and [Portfolio Acceptance](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41216785616)
+are green on the main branch. The Render service is provisioned, but no hosted
+demo is claimed until a real Render Layer-4 verification run succeeds.
 
 ---
 
@@ -61,7 +61,7 @@ Train
 --> Metrics[DagsHub MLflow]
 
 Deploy
---> HF[Hugging Face Spaces]
+--> Render[Render Free service]
 ```
 
 Atlas demonstrates an end-to-end production workflow:
@@ -114,7 +114,7 @@ Verifies the deployed application through health checks, inference tests, schema
 
 The four layers describe the intended control plane. The repository currently
 enforces data/engineering checks, model validation and local serving checks;
-hosted HF verification and production alias promotion remain gated by the
+hosted Render verification and production alias promotion remain gated by the
 configured deployment workflow.
 
 ---
@@ -129,7 +129,7 @@ configured deployment workflow.
 | Infrastructure | Terraform (HCP) |
 | Containers | Docker |
 | Backend | FastAPI |
-| Deployment | Hugging Face Spaces |
+| Deployment | Render Free (Docker) |
 | Cloud | AWS (optional) |
 
 ---
@@ -215,16 +215,17 @@ The emphasis is on building AI systems that can be trusted in production.
 
 ## Continuous deployment
 
-`.github/workflows/deploy.yml` provides the Docker-based Hugging Face Space
-staging path. A successful full-train run hands off its exact `model.pkl` and
-immutable candidate metadata to the deployment workflow; the workflow verifies
-the local serving contract, pushes the same artifact to the configured Space,
-waits for hosted health and runs the Layer-4 inference/golden checks. Configure
-the repository variables `HF_SPACE_REPO` and `HF_SPACE_URL` plus secret
-`HF_TOKEN` before enabling the hosted stage. `HF_SPACE_URL` must be the actual
-`https://<space>.hf.space` runtime URL; the workflow never guesses it from the
-repository name. Manual dispatch also requires the exact successful Full Train
-run ID containing the candidate artifact. Without these values, the workflow
-records an explicit skipped state instead of pretending that deployment
-occurred. Production alias promotion remains a protected, manual MLflow
-operation after hosted verification.
+`.github/workflows/deploy.yml` provides the controlled Render staging path. A
+successful Full Train run hands off its exact `model.pkl` and immutable
+candidate metadata; after local Layer-4 verification, the workflow publishes
+the pinned source snapshot plus those artifacts to the dedicated
+`render-release` branch, triggers Render through an owner-configured deploy
+hook, waits for the service to become ready and runs the hosted Layer-4
+identity/inference checks. Configure `RENDER_SERVICE_URL`, optionally
+`RENDER_RELEASE_BRANCH`, and the `RENDER_DEPLOY_HOOK` secret. The existing
+Render service must be linked to the release branch with auto-deploy disabled.
+Manual dispatch still requires the exact successful Full Train run ID
+containing the candidate artifact. A missing Render configuration fails the
+workflow rather than presenting a skipped check as deployment evidence.
+Production alias promotion remains a protected, manual MLflow operation after
+hosted verification.
