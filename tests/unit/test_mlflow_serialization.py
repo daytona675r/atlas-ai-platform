@@ -30,7 +30,7 @@ def _training_frame() -> tuple[pd.DataFrame, list[int]]:
 def test_configured_estimators_round_trip_through_mlflow_save_model() -> None:
     frame, labels = _training_frame()
     for model_cfg, trusted_types in [
-        ({"type": "logistic_regression", "max_iter": 50}, []),
+        ({"type": "logistic_regression", "max_iter": 50}, ["numpy.dtype"]),
         (
             {"type": "hist_gradient_boosting", "max_iter": 5},
             [

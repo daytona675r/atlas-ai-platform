@@ -102,14 +102,17 @@ def run_training(config_path: Path | str) -> str:
             save_model_kwargs = {
                 "signature": signature,
                 "input_example": x_test.head(5),
+                # This concrete NumPy type is emitted by both configured
+                # sklearn pipelines and is required by skops during its
+                # serialization audit.
+                "skops_trusted_types": ["numpy.dtype"],
             }
             if cfg["model"].get("type") == "hist_gradient_boosting":
                 # These are the concrete sklearn types created by our own
                 # configured estimator and reviewed for this trusted artifact.
-                save_model_kwargs["skops_trusted_types"] = [
-                    "numpy.dtype",
-                    "sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor",
-                ]
+                save_model_kwargs["skops_trusted_types"].append(
+                    "sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor"
+                )
             # Save the complete MLflow model directory first, then upload its
             # contents explicitly.  Some remote artifact stores accept generic
             # artifact uploads more reliably than the model-flavor convenience
