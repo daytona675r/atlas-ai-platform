@@ -33,6 +33,20 @@ def _missing_alias(error: Exception) -> bool:
     return "alias" in message and ("not found" in message or "does not exist" in message)
 
 
+def _registry_has_versions(client: MlflowClient, model_name: str) -> bool:
+    """Check whether a registry model exists when alias lookup is ambiguous.
+
+    Some hosted MLflow backends return ``INVALID_PARAMETER_VALUE`` rather than
+    a missing-resource error when the first model has not been registered yet.
+    Treat that response as bootstrap only when the registry confirms that no
+    versions exist; an existing model with a broken alias remains fail-closed.
+    """
+    try:
+        return bool(list(client.search_model_versions(f"name='{model_name}'")))
+    except Exception as error:
+        raise ChampionLookupError(f"registry version lookup failed: {error}") from error
+
+
 def get_champion_f1(client: MlflowClient, model_name: str) -> float | None:
     """Read ``test_f1`` from the real production alias.
 
@@ -44,6 +58,12 @@ def get_champion_f1(client: MlflowClient, model_name: str) -> float | None:
         version = client.get_model_version_by_alias(model_name, "production")
     except Exception as error:  # MLflow uses several exception subclasses by version
         if _missing_alias(error):
+            return None
+        if (
+            isinstance(error, MlflowException)
+            and getattr(error, "error_code", None) == "INVALID_PARAMETER_VALUE"
+            and not _registry_has_versions(client, model_name)
+        ):
             return None
         raise ChampionLookupError(f"production alias lookup failed: {error}") from error
 
