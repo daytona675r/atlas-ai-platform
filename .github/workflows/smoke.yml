@@ -63,13 +63,10 @@ jobs:
         run: python -m mlops.cli mlflow-ping
 
       - name: VAL-L2-07 Mini train
-        run: |
-          if [ -z "$MLFLOW_TRACKING_URI" ]; then export MLFLOW_DISABLED=1; fi
-          RUN_ID=$(python -m mlops.cli train --config configs/smoke.yaml | tail -1)
-          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+        run: bash scripts/smoke_mini_train.sh
 
       - name: VAL-L2-08 Artifact exists
-        run: test -f model.pkl
+        run: test -s model.pkl
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
