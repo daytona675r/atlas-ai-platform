@@ -1,7 +1,6 @@
 import os
-from pathlib import Path
 import subprocess
-
+from pathlib import Path
 
 SCRIPT = Path(__file__).parents[2] / "scripts" / "smoke_mini_train.sh"
 
