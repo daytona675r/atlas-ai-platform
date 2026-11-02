@@ -25,6 +25,19 @@ def test_health(client: TestClient) -> None:
     assert r.json()["status"] == "ok"
 
 
+def test_landing_page(client: TestClient) -> None:
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    assert "Atlas AI Platform" in r.text
+    assert "From model training to verifiable deployment" in r.text
+    assert "/docs" in r.text
+    assert "/health" in r.text
+    assert "/model-info" in r.text
+    assert "L1 · Data" in r.text
+    assert "L4 · Deployment" in r.text
+
+
 def test_predict(client: TestClient) -> None:
     payload = json.loads((REPO_ROOT / "tests" / "fixtures" / "predict_request.json").read_text())
     r = client.post("/predict", json=payload)

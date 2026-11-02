@@ -30,10 +30,13 @@ Atlas is a focused engineering reference implementation. It separates checks
 that run in credential-free CI from optional cloud and hosted stages, so a green
 local pipeline is never presented as proof of a hosted deployment.
 
-Current evidence: [Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41216785957)
-and [Portfolio Acceptance](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41216785616)
-are green on the main branch. The Render service is provisioned, but no hosted
-demo is claimed until a real Render Layer-4 verification run succeeds.
+Current evidence: [Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41450786894),
+[Portfolio Acceptance](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41450786497),
+[Full Train](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41451322226)
+and [hosted Render Layer 4](https://github.com/daytona675r/atlas-ai-platform/actions/runs/41451524201)
+are green. The public demo is available at
+https://atlas-ai-platform-demo.onrender.com/; Render Free may cold-start after
+idle periods.
 
 ---
 
@@ -112,10 +115,9 @@ Evaluates training quality, reproducibility, overfitting safeguards and champion
 
 Verifies the deployed application through health checks, inference tests, schema validation and production readiness.
 
-The four layers describe the intended control plane. The repository currently
-enforces data/engineering checks, model validation and local serving checks;
-hosted Render verification and production alias promotion remain gated by the
-configured deployment workflow.
+The four layers describe the control plane enforced by the repository and its
+hosted deployment workflow. Production alias promotion remains a separate
+protected manual operation.
 
 ---
 

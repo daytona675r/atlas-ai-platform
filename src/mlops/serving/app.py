@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 from pathlib import Path
@@ -10,11 +11,14 @@ import joblib
 import mlflow
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from mlops.models.pipeline import feature_columns
 
 app = FastAPI(title="Adult Income API", version="0.1.0")
+
+_LANDING_TEMPLATE = Path(__file__).with_name("index.html")
 
 _model = None
 _model_info: dict[str, str] | None = None
@@ -87,6 +91,41 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+def _landing_value(value: object | None) -> str:
+    """Return a safe display value for optional deployed provenance."""
+    if value is None or not str(value).strip() or str(value) == "local":
+        return "Unavailable"
+    return str(value)
+
+
+def _render_landing_page() -> str:
+    """Render the public project page without changing the serving contracts."""
+    load_model()
+    info = _model_info or {}
+    source_run_id = info.get("source_run_id")
+    source_run_url = (
+        f"https://github.com/daytona675r/atlas-ai-platform/actions/runs/{source_run_id}"
+        if source_run_id and source_run_id.isdigit()
+        else "https://github.com/daytona675r/atlas-ai-platform/actions/workflows/train.yml"
+    )
+    values = {
+        "{{COMMIT_SHA}}": html.escape(_landing_value(info.get("commit_sha"))),
+        "{{SOURCE_RUN_ID}}": html.escape(_landing_value(source_run_id)),
+        "{{MLFLOW_RUN_ID}}": html.escape(_landing_value(info.get("run_id"))),
+        "{{MODEL_SHA256}}": html.escape(_landing_value(info.get("model_sha256"))),
+        "{{SOURCE_RUN_URL}}": html.escape(source_run_url, quote=True),
+    }
+    page = _LANDING_TEMPLATE.read_text(encoding="utf-8")
+    for token, value in values.items():
+        page = page.replace(token, value)
+    return page
+
+
+@app.get("/", response_class=HTMLResponse)
+def landing_page() -> HTMLResponse:
+    return HTMLResponse(_render_landing_page())
 
 
 @app.get("/model-info")

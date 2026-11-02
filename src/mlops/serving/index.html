@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Atlas AI Platform: reproducible training, verifiable model quality and controlled delivery.">
+  <title>Atlas AI Platform · Verifiable model delivery</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0c1118; --panel:#121b26; --line:#253548; --text:#edf4fb; --muted:#aab9c9; --accent:#6ec5ff; --accent-2:#9de0c0; --max:1120px; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    a { color:var(--accent); }
+    a:focus-visible { outline:3px solid var(--accent-2); outline-offset:4px; }
+    .wrap { width:min(calc(100% - 2.5rem),var(--max)); margin:auto; }
+    header { padding:4.5rem 0 3rem; border-bottom:1px solid var(--line); }
+    .eyebrow { margin:0 0 1rem; color:var(--accent-2); font-size:.75rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase; }
+    h1,h2,h3 { line-height:1.15; letter-spacing:-.025em; }
+    h1 { max-width:720px; margin:0; font-size:clamp(2.5rem,7vw,5.4rem); }
+    .lede { max-width:680px; margin:1.5rem 0 0; color:var(--muted); font-size:clamp(1.05rem,2vw,1.3rem); }
+    nav { display:flex; flex-wrap:wrap; gap:.9rem 1.2rem; margin-top:2rem; }
+    .button { display:inline-block; padding:.7rem 1rem; border:1px solid var(--accent); border-radius:999px; text-decoration:none; }
+    .button.primary { background:var(--accent); color:#071019; font-weight:700; }
+    main { padding:3rem 0 4rem; }
+    section { margin:0 0 4rem; }
+    h2 { margin:0 0 1.2rem; font-size:clamp(1.65rem,3vw,2.3rem); }
+    h3 { margin:.3rem 0 .5rem; font-size:1.1rem; }
+    .intro { max-width:760px; color:var(--muted); }
+    .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:1.5rem; }
+    .card { padding:1.25rem; border:1px solid var(--line); border-radius:1rem; background:var(--panel); }
+    .card p { margin:0; color:var(--muted); font-size:.94rem; }
+    .layer { color:var(--accent-2); font-size:.78rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+    .pipeline { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; margin:1.5rem 0 0; }
+    .step { padding:.7rem .9rem; border:1px solid var(--line); border-radius:.65rem; background:var(--panel); }
+    .arrow { color:var(--accent); }
+    .provenance { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:1.5rem; }
+    .provenance dt { color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; }
+    .provenance dd { margin:.3rem 0 0; overflow-wrap:anywhere; font: .9rem/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .links { display:flex; flex-wrap:wrap; gap:1rem 1.5rem; }
+    footer { padding:2rem 0; border-top:1px solid var(--line); color:var(--muted); font-size:.9rem; }
+    @media (max-width:760px) { header { padding-top:3rem; } .grid,.provenance { grid-template-columns:1fr 1fr; } }
+    @media (max-width:460px) { .wrap { width:min(calc(100% - 1.5rem),var(--max)); } .grid,.provenance { grid-template-columns:1fr; } .pipeline { align-items:stretch; flex-direction:column; } .arrow { transform:rotate(90deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Atlas AI Platform · engineering reference implementation</p>
+      <h1>From model training to verifiable deployment</h1>
+      <p class="lede">Atlas demonstrates how an AI system can be made reproducible and operable: tracked model lineage, explicit quality gates and controlled delivery into a serving API.</p>
+      <nav aria-label="Primary navigation">
+        <a class="button primary" href="/docs">Explore API / Try Swagger</a>
+        <a class="button" href="https://github.com/daytona675r/atlas-ai-platform">View GitHub source</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <section aria-labelledby="architecture-title">
+      <h2 id="architecture-title">A delivery system around the model</h2>
+      <p class="intro">The model is only one part of Atlas. The reference implementation connects data checks, engineering validation, model evaluation and deployment verification into a traceable path.</p>
+      <div class="pipeline" aria-label="Atlas delivery pipeline">
+        <span class="step">Data</span><span class="arrow" aria-hidden="true">→</span>
+        <span class="step">CI / Smoke</span><span class="arrow" aria-hidden="true">→</span>
+        <span class="step">Full Train + MLflow Registry</span><span class="arrow" aria-hidden="true">→</span>
+        <span class="step">Verified Render serving</span>
+      </div>
+      <div class="grid">
+        <article class="card"><span class="layer">L1 · Data</span><h3>Data validation</h3><p>Checks completeness, structure and reproducibility before training.</p></article>
+        <article class="card"><span class="layer">L2 · Engineering</span><h3>Engineering gates</h3><p>Runs linting, tests, image builds and smoke training.</p></article>
+        <article class="card"><span class="layer">L3 · Model</span><h3>Model validation</h3><p>Evaluates quality, lineage, promotion rules and regression safeguards.</p></article>
+        <article class="card"><span class="layer">L4 · Deployment</span><h3>Serving verification</h3><p>Checks health, provenance, inference contracts and deployed behavior.</p></article>
+      </div>
+    </section>
+    <section aria-labelledby="provenance-title">
+      <h2 id="provenance-title">Deployed model provenance</h2>
+      <p class="intro">These values are read from the candidate metadata used by the serving container. They identify the artifact without presenting a model score or an unverified production claim.</p>
+      <dl class="provenance">
+        <div class="card"><dt>Source commit</dt><dd>{{COMMIT_SHA}}</dd></div>
+        <div class="card"><dt>Full Train run</dt><dd><a href="{{SOURCE_RUN_URL}}">{{SOURCE_RUN_ID}}</a></dd></div>
+        <div class="card"><dt>MLflow run</dt><dd>{{MLFLOW_RUN_ID}}</dd></div>
+        <div class="card"><dt>Model SHA-256</dt><dd>{{MODEL_SHA256}}</dd></div>
+      </dl>
+    </section>
+    <section aria-labelledby="try-title">
+      <h2 id="try-title">Try the model</h2>
+      <p class="intro">Atlas uses the Adult Census Income dataset as a lightweight demonstration so the engineering workflow stays visible. The dataset is not the showcase's main value; use the documented API to inspect the serving contract.</p>
+      <p><a class="button primary" href="/docs#/default/predict_predict_post">Open POST /predict in Swagger</a></p>
+    </section>
+    <section aria-labelledby="links-title">
+      <h2 id="links-title">Evidence and endpoints</h2>
+      <div class="links">
+        <a href="https://github.com/daytona675r/atlas-ai-platform">GitHub repository</a>
+        <a href="/health">/health</a>
+        <a href="/model-info">/model-info</a>
+        <a href="/docs">/docs</a>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <div class="wrap"><p>Hosted on Render Free; an idle service may cold-start. Production alias promotion remains a separate protected manual operation.</p></div>
+  </footer>
+</body>
+</html>
