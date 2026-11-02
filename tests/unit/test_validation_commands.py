@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 from mlflow.exceptions import MlflowException
+from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE, RESOURCE_DOES_NOT_EXIST
 
 from mlops import cli
 from mlops.promotion_gate import ChampionLookupError, check_champion, get_champion_f1
@@ -120,11 +121,11 @@ def test_validate_layer1_full_rejects_unexpected_duplicate(monkeypatch, tmp_path
 def test_promotion_gate_allows_explicit_first_model_bootstrap(monkeypatch) -> None:
     run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
     registered = SimpleNamespace(aliases={"staging": "1"})
+    missing_alias = MlflowException("missing production alias", error_code=INVALID_PARAMETER_VALUE)
+    assert missing_alias.error_code == "INVALID_PARAMETER_VALUE"
     client = SimpleNamespace(
         get_run=lambda _: run,
-        get_model_version_by_alias=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            MlflowException("missing production alias", error_code="INVALID_PARAMETER_VALUE")
-        ),
+        get_model_version_by_alias=lambda *_args, **_kwargs: (_ for _ in ()).throw(missing_alias),
         get_registered_model=lambda _: registered,
     )
     monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
@@ -137,7 +138,7 @@ def test_promotion_gate_bootstraps_when_staging_exists_but_production_is_absent(
 ) -> None:
     client = SimpleNamespace(
         get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(
-            MlflowException("alias lookup failed", error_code="INVALID_PARAMETER_VALUE")
+            MlflowException("alias lookup failed", error_code=INVALID_PARAMETER_VALUE)
         ),
         get_registered_model=lambda _: SimpleNamespace(aliases={"staging": "1"}),
     )
@@ -148,7 +149,7 @@ def test_promotion_gate_bootstraps_when_staging_exists_but_production_is_absent(
 def test_promotion_gate_rejects_failed_lookup_when_production_alias_is_present() -> None:
     client = SimpleNamespace(
         get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(
-            MlflowException("alias lookup failed", error_code="INVALID_PARAMETER_VALUE")
+            MlflowException("alias lookup failed", error_code=INVALID_PARAMETER_VALUE)
         ),
         get_registered_model=lambda _: SimpleNamespace(aliases={"production": "2", "staging": "1"}),
     )
@@ -159,7 +160,7 @@ def test_promotion_gate_rejects_failed_lookup_when_production_alias_is_present()
 def test_promotion_gate_rejects_malformed_alias_metadata() -> None:
     client = SimpleNamespace(
         get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(
-            MlflowException("alias lookup failed", error_code="INVALID_PARAMETER_VALUE")
+            MlflowException("alias lookup failed", error_code=INVALID_PARAMETER_VALUE)
         ),
         get_registered_model=lambda _: SimpleNamespace(aliases=None),
     )
@@ -168,7 +169,8 @@ def test_promotion_gate_rejects_malformed_alias_metadata() -> None:
 
 
 def test_promotion_gate_allows_confirmed_absent_model(monkeypatch) -> None:
-    missing = MlflowException("model missing", error_code="RESOURCE_DOES_NOT_EXIST")
+    missing = MlflowException("model missing", error_code=RESOURCE_DOES_NOT_EXIST)
+    assert missing.error_code == "RESOURCE_DOES_NOT_EXIST"
     client = SimpleNamespace(
         get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(missing),
         get_registered_model=lambda *_args: (_ for _ in ()).throw(missing),
