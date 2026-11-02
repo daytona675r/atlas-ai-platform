@@ -134,15 +134,7 @@ jobs:
           SOURCE_SHA: ${{ needs.configuration.outputs.source_sha }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin "$RENDER_RELEASE_BRANCH" || true
-          git checkout -B "$RENDER_RELEASE_BRANCH" "$SOURCE_SHA"
-          test -s model.pkl
-          test -s candidate-metadata.json
-          git add model.pkl candidate-metadata.json
-          git commit -m "Render release $SOURCE_SHA" || echo "Release artifacts already present"
-          git push --force-with-lease origin "HEAD:refs/heads/$RENDER_RELEASE_BRANCH"
+          bash scripts/publish_render_release.sh "$RENDER_RELEASE_BRANCH" "$SOURCE_SHA"
 
       - name: Trigger Render deploy
         env:

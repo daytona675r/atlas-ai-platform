@@ -9,7 +9,7 @@ def test_deploy_uses_render_release_handoff_and_fails_closed() -> None:
     assert "RENDER_DEPLOY_HOOK" in workflow
     assert "render-release" in workflow
     assert "contents: write" in workflow
-    assert "git push --force-with-lease" in workflow
+    assert "scripts/publish_render_release.sh" in workflow
     assert 'curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK"' in workflow
     assert "Deployment skipped" not in workflow
     assert "HF_SPACE" not in workflow
