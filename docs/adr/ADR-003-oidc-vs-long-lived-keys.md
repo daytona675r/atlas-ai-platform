@@ -19,4 +19,4 @@ Short-lived tokens; no rotation of access keys in secrets.
 ## Consequences
 
 - `terraform-plan.yml` / apply use `aws-actions/configure-aws-credentials` with `role-to-assume`.
-- DagsHub and Hugging Face still use repository secrets (no OIDC on those platforms in v1).
+- DagsHub and Render still use repository secrets (no OIDC on those platforms in v1).
