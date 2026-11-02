@@ -6,9 +6,10 @@ from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+from mlflow.exceptions import MlflowException
 
 from mlops import cli
-from mlops.promotion_gate import check_champion, get_champion_f1
+from mlops.promotion_gate import ChampionLookupError, check_champion, get_champion_f1
 from mlops.validation import validate_data
 
 
@@ -118,15 +119,63 @@ def test_validate_layer1_full_rejects_unexpected_duplicate(monkeypatch, tmp_path
 
 def test_promotion_gate_allows_explicit_first_model_bootstrap(monkeypatch) -> None:
     run = SimpleNamespace(data=SimpleNamespace(metrics={"test_f1": 0.8}))
+    registered = SimpleNamespace(aliases={"staging": "1"})
     client = SimpleNamespace(
         get_run=lambda _: run,
         get_model_version_by_alias=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            KeyError("missing")
+            MlflowException("missing production alias", error_code="INVALID_PARAMETER_VALUE")
         ),
+        get_registered_model=lambda _: registered,
     )
     monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
     assert get_champion_f1(client, "model") is None
     assert check_champion("run", {"registry_model_name": "model"})[0]
+
+
+def test_promotion_gate_bootstraps_when_staging_exists_but_production_is_absent(
+    monkeypatch,
+) -> None:
+    client = SimpleNamespace(
+        get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(
+            MlflowException("alias lookup failed", error_code="INVALID_PARAMETER_VALUE")
+        ),
+        get_registered_model=lambda _: SimpleNamespace(aliases={"staging": "1"}),
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    assert get_champion_f1(client, "model") is None
+
+
+def test_promotion_gate_rejects_failed_lookup_when_production_alias_is_present() -> None:
+    client = SimpleNamespace(
+        get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(
+            MlflowException("alias lookup failed", error_code="INVALID_PARAMETER_VALUE")
+        ),
+        get_registered_model=lambda _: SimpleNamespace(aliases={"production": "2", "staging": "1"}),
+    )
+    with pytest.raises(ChampionLookupError, match="production alias is present"):
+        get_champion_f1(client, "model")
+
+
+def test_promotion_gate_rejects_malformed_alias_metadata() -> None:
+    client = SimpleNamespace(
+        get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(
+            MlflowException("alias lookup failed", error_code="INVALID_PARAMETER_VALUE")
+        ),
+        get_registered_model=lambda _: SimpleNamespace(aliases=None),
+    )
+    with pytest.raises(ChampionLookupError, match="aliases metadata is missing or malformed"):
+        get_champion_f1(client, "model")
+
+
+def test_promotion_gate_allows_confirmed_absent_model(monkeypatch) -> None:
+    missing = MlflowException("model missing", error_code="RESOURCE_DOES_NOT_EXIST")
+    client = SimpleNamespace(
+        get_model_version_by_alias=lambda *_args: (_ for _ in ()).throw(missing),
+        get_registered_model=lambda *_args: (_ for _ in ()).throw(missing),
+        search_model_versions=lambda *_args: [],
+    )
+    monkeypatch.setattr("mlops.promotion_gate.MlflowClient", lambda: client)
+    assert get_champion_f1(client, "model") is None
 
 
 def test_cli_dispatches_validate_data(monkeypatch) -> None:

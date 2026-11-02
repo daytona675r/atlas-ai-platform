@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import math
 import sys
 from typing import Any
@@ -11,6 +12,8 @@ from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
 from mlops.config import REPO_ROOT, load_yaml
+
+logger = logging.getLogger(__name__)
 
 
 class ChampionLookupError(RuntimeError):
@@ -21,30 +24,48 @@ def load_thresholds() -> dict[str, Any]:
     return load_yaml(REPO_ROOT / "configs" / "validation_thresholds.yaml")
 
 
-def _missing_alias(error: Exception) -> bool:
-    """Return true only for an explicitly absent production alias."""
+def _confirm_no_production_alias(client: MlflowClient, model_name: str) -> bool:
+    """Use registered-model metadata to prove the production alias is absent."""
+    try:
+        registered = client.get_registered_model(model_name)
+    except Exception as error:
+        error_code = getattr(error, "error_code", None)
+        if error_code != "RESOURCE_DOES_NOT_EXIST":
+            raise ChampionLookupError(f"registered model lookup failed: {error}") from error
+        try:
+            versions = list(client.search_model_versions(f"name='{model_name}'"))
+        except Exception as search_error:
+            raise ChampionLookupError(
+                f"registry version lookup failed: {search_error}"
+            ) from search_error
+        if versions:
+            raise ChampionLookupError(
+                "registered model metadata is missing although model versions exist"
+            )
+        logger.info("Production alias absent: registered model %s does not exist", model_name)
+        return True
+
+    aliases = getattr(registered, "aliases", None)
+    if not isinstance(aliases, dict):
+        raise ChampionLookupError("registered model aliases metadata is missing or malformed")
+    if "production" in aliases:
+        raise ChampionLookupError(
+            "production alias is present but alias resolution failed; refusing bootstrap"
+        )
+    logger.info("Production alias absent: registered model %s aliases=%s", model_name, aliases)
+    return True
+
+
+def _alias_lookup_needs_metadata(error: Exception) -> bool:
     if isinstance(error, KeyError):
         return True
     if isinstance(error, MlflowException):
-        error_code = getattr(error, "error_code", None)
-        if error_code == "RESOURCE_DOES_NOT_EXIST":
-            return True
+        return getattr(error, "error_code", None) in {
+            "INVALID_PARAMETER_VALUE",
+            "RESOURCE_DOES_NOT_EXIST",
+        }
     message = str(error).lower()
     return "alias" in message and ("not found" in message or "does not exist" in message)
-
-
-def _registry_has_versions(client: MlflowClient, model_name: str) -> bool:
-    """Check whether a registry model exists when alias lookup is ambiguous.
-
-    Some hosted MLflow backends return ``INVALID_PARAMETER_VALUE`` rather than
-    a missing-resource error when the first model has not been registered yet.
-    Treat that response as bootstrap only when the registry confirms that no
-    versions exist; an existing model with a broken alias remains fail-closed.
-    """
-    try:
-        return bool(list(client.search_model_versions(f"name='{model_name}'")))
-    except Exception as error:
-        raise ChampionLookupError(f"registry version lookup failed: {error}") from error
 
 
 def get_champion_f1(client: MlflowClient, model_name: str) -> float | None:
@@ -57,13 +78,7 @@ def get_champion_f1(client: MlflowClient, model_name: str) -> float | None:
     try:
         version = client.get_model_version_by_alias(model_name, "production")
     except Exception as error:  # MLflow uses several exception subclasses by version
-        if _missing_alias(error):
-            return None
-        if (
-            isinstance(error, MlflowException)
-            and getattr(error, "error_code", None) == "INVALID_PARAMETER_VALUE"
-            and not _registry_has_versions(client, model_name)
-        ):
+        if _alias_lookup_needs_metadata(error) and _confirm_no_production_alias(client, model_name):
             return None
         raise ChampionLookupError(f"production alias lookup failed: {error}") from error
 
