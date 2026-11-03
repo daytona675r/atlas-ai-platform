@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+<title id="title">Atlas AI Platform — From training to verified deployment</title>
+<desc id="desc">Four linked steps: Data validation, Full train, Model registry, and verified deployment, controlled by explicit quality gates.</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07111d"/><stop offset=".55" stop-color="#0b2034"/><stop offset="1" stop-color="#052a33"/></linearGradient>
+<linearGradient id="stroke" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#3ba9fa"/><stop offset="1" stop-color="#5bf2c0"/></linearGradient>
+<linearGradient id="teal" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#40b3ff"/><stop offset="1" stop-color="#6bffe0"/></linearGradient>
+<linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#153047"/><stop offset="1" stop-color="#0c1b2d"/></linearGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="22"/></filter>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" stroke="#69b5db" stroke-width=".55" fill="none" opacity=".16"/></pattern>
+<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#66cbfb"/></marker>
+</defs>
+<rect width="1280" height="640" fill="url(#bg)"/>
+<rect width="1280" height="640" fill="url(#grid)"/>
+<ellipse cx="1040" cy="60" rx="320" ry="120" fill="#0a879b" opacity=".18" filter="url(#glow)"/>
+<path d="M770 140Q920 40 1040 98T1280 110" fill="none" stroke="#20a4d0" stroke-width="1.5" opacity=".45"/>
+<path d="M740 166Q920 72 1060 121T1280 137" fill="none" stroke="#2ff3cc" stroke-width="1.3" opacity=".32"/>
+<path d="M0 586Q320 510 610 576T1280 518V640H0Z" fill="#0e3750" opacity=".55"/>
+<path d="M0 611Q290 558 620 608T1280 550" fill="none" stroke="#31decb" stroke-width="2" opacity=".38"/>
+<rect x="72" y="48" width="54" height="4" rx="2" fill="#59f0d4"/>
+<text x="145" y="56" fill="#9dc0df" font-family="Arial,sans-serif" font-size="21" letter-spacing="2">MLOPS  /  MODEL LIFECYCLE  /  RELIABLE DELIVERY</text>
+<text x="72" y="151" fill="#f3f9ff" font-family="Arial,sans-serif" font-weight="700" font-size="72">Atlas <tspan fill="#4bbfff">AI</tspan> Platform</text>
+<text x="74" y="207" fill="#74e7e6" font-family="Arial,sans-serif" font-weight="600" font-size="34">From training to verified deployment</text>
+<text x="74" y="251" fill="#b7cbdc" font-family="Arial,sans-serif" font-size="20">Reproducible model delivery with MLflow lineage and explicit validation gates.</text>
+<g font-family="Arial,sans-serif">
+<rect x="74" y="318" width="243" height="112" rx="18" fill="url(#panel)" stroke="#357bb2" stroke-width="2"/>
+<rect x="363" y="318" width="243" height="112" rx="18" fill="url(#panel)" stroke="#357bb2" stroke-width="2"/>
+<rect x="652" y="318" width="243" height="112" rx="18" fill="url(#panel)" stroke="#357bb2" stroke-width="2"/>
+<rect x="941" y="318" width="243" height="112" rx="18" fill="#0b3437" stroke="#31e0be" stroke-width="2"/>
+<path d="M317 374H347M606 374H636M895 374H925" stroke="#66cbfb" stroke-width="3" marker-end="url(#arr)"/>
+<g font-size="22" fill="#f7fbff" font-weight="600" text-anchor="middle">
+<text x="195" y="362">Data</text><text x="195" y="393">validation</text>
+<text x="484" y="377">Full train</text>
+<text x="773" y="362">Model</text><text x="773" y="393">registry</text>
+<text x="1063" y="362">Verified</text><text x="1063" y="393">deployment</text>
+</g>
+<circle cx="295" cy="326" r="15" fill="#52ecc5"/><path d="m288 326 5 5 9-11" fill="none" stroke="#052b2e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1163" cy="326" r="15" fill="#52ecc5"/><path d="m1156 326 5 5 9-11" fill="none" stroke="#052b2e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path d="M130 446V466Q130 478 142 478H1116Q1128 478 1128 466V446" fill="none" stroke="url(#stroke)" stroke-width="2"/>
+<rect x="459" y="466" width="350" height="30" rx="15" fill="#082434"/>
+<text x="634" y="488" font-family="Arial,sans-serif" font-size="17" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#54f0d1">EXPLICIT QUALITY GATES</text>
+<g font-family="Arial,sans-serif" font-size="17">
+<text x="74" y="559" fill="#dbeeff" font-weight="700">MLOps</text><text x="74" y="585" fill="#96b4ca">Reproducible training</text>
+<path d="M430 536V592" stroke="#3e6785" stroke-width="1"/>
+<text x="469" y="559" fill="#dbeeff" font-weight="700">Model lineage</text><text x="469" y="585" fill="#96b4ca">Traceable candidate identity</text>
+<path d="M862 536V592" stroke="#3e6785" stroke-width="1"/>
+<text x="902" y="559" fill="#dbeeff" font-weight="700">Reliability</text><text x="902" y="585" fill="#96b4ca">Hosted inference verification</text>
+</g>
+</svg>
