@@ -1,5 +1,7 @@
 # Atlas AI Platform
 
+[![Atlas AI Platform — From training to verified deployment](docs/assets/atlas-banner.svg)](https://atlas-ai-platform-demo.onrender.com/)
+
 > **Atlas is an AI infrastructure reference implementation: a senior-engineering approach to reproducible training, verifiable model quality and controlled delivery.**
 
 [![Smoke CI](https://github.com/daytona675r/atlas-ai-platform/actions/workflows/smoke.yml/badge.svg)](../../actions/workflows/smoke.yml)
